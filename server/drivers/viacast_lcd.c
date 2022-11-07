@@ -36,6 +36,8 @@
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <gfxprim/gfxprim.h>
+#include <gfxprim/text/gp_text_style.h>
+#include <gfxprim/text/gp_fonts.h>
 
 #include "lcd.h"
 #include "viacast_lcd.h"
@@ -55,12 +57,16 @@ typedef struct text_private_data {
 	int fbdev_bytes;
 	int fbdev_data_size;
   char *framebuf_fbdev;		/**< fram buffer /dev/fbdev*/
+  char *framebuf_fbdev_copy;		/**< fram buffer /dev/fbdev*/
 	struct fb_var_screeninfo fb_info;
 	int autorotate;
 	int rotate;
 	int keypad_rotate;
+	
 	gp_pixmap *pixmap;
-
+	gp_pixel black_pixel;
+	gp_pixel white_pixel;
+	gp_text_style text_style;
 } PrivateData;
 
 
@@ -257,13 +263,30 @@ viacast_lcd_init(Driver *drvthis)
 	p->fbdev_bytes = p->fb_info.bits_per_pixel / 8;
 	p->fbdev_data_size = p->fb_info.xres * p->fb_info.yres * p->fbdev_bytes;
 	
-	/* make sure the frame buffer of fbdev is there... */
 	p->framebuf_fbdev = malloc(p->fbdev_data_size);
-	if (p->framebuf_fbdev == NULL) {
-		report(RPT_ERR, "%s: unable to create framebuffer fbdev", drvthis->name);
-		return -1;
-	}
-	memset(p->framebuf_fbdev, ' ', p->width * p->height);
+	// /* make sure the frame buffer of fbdev is there... */
+	// p->pixmap->pixels = malloc(p->fbdev_data_size);
+	// if (p->pixmap->pixels == NULL) {
+	// 	report(RPT_ERR, "%s: unable to create framebuffer fbdev", drvthis->name);
+	// 	return -1;
+	// }
+	// memset(p->pixmap->pixels, ' ', p->width * p->height);
+
+
+  p->pixmap = gp_pixmap_alloc(p->fb_info.xres, p->fb_info.yres, GP_PIXEL_RGB565);
+	p->black_pixel = gp_rgb_to_pixmap_pixel(0x00, 0x00, 0x00, p->pixmap);
+  p->white_pixel = gp_rgb_to_pixmap_pixel(0xff, 0xff, 0xff, p->pixmap);
+  gp_text_style tmp_style = GP_DEFAULT_TEXT_STYLE;
+	const gp_font_family* font_family = gp_font_family_lookup("tiny");
+	tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
+	p->text_style = tmp_style;	
+
+	gp_pixmap_rotate_cw(p->pixmap);
+
+
+	// if (p->rotate == 1){
+	// 	gp_pixmap_rotate_cw()
+	// }
 
 	report(RPT_INFO, "Infos about fbdev\nwidth:%d\nheight:%d\nbits_per_pixel:%d",
 	 p->fb_info.xres, p->fb_info.yres, p->fb_info.bits_per_pixel);
@@ -346,45 +369,33 @@ viacast_lcd_clear (Driver *drvthis)
 MODULE_EXPORT void
 viacast_lcd_flush (Driver *drvthis)
 {
-	// PrivateData *p = drvthis->private_data;
-	// char out[LCD_MAX_WIDTH];
-	// int i;
-
-	// memset(out, '-', p->width);
-	// out[p->width] = '\0';
-	// // printf("+%s+\n", out);
-
-	// for (i = 0; i < p->height; i++) {
-	// 	memcpy(out, p->framebuf_lcdproc + (i * p->width), p->width);
-	// 	out[p->width] = '\0';
-	// 	printf("%s\n", out);
-	// }
-
-	// memset(out, '-', p->width);
-	// out[p->width] = '\0';
-	// // printf("+%s+\n", out);
-
 	PrivateData *p = drvthis->private_data;
 
-  report(RPT_INFO, "%s: %s", drvthis->name, p->framebuf_lcdproc);			
 
-
-	// p->fd_fbdev = open(p->fbdev, O_RDONLY);
-	// if (p->fd_fbdev < 0){
-	// 	report(RPT_ERR, "%s: open(%s) failed (%s)",
-	// 			drvthis->name, p->fbdev, strerror(errno));
-	// 	return;
-	// }
 	p->framebuf_fbdev = mmap (0, p->fbdev_data_size, PROT_READ, MAP_SHARED, p->fd_fbdev, (off_t)0);
-	// close (p->fd_fbdev);
 
-	// int n_writes = 10;
+	memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
+
+	gp_pixmap* res1 = gp_filter_resize_alloc(p->pixmap, gp_pixmap_w(p->pixmap), (gp_pixmap_w(p->pixmap) / 160) * 128, 0, NULL);
+	gp_fill(p->pixmap, p->black_pixel);
+	gp_blit_clipped(res1,0,0,gp_pixmap_w(res1),gp_pixmap_h(res1),p->pixmap,0,0);
+	gp_pixmap_free(res1);		
+
+	// gp_pixmap *subpixmap = gp_sub_pixmap_alloc(p->pixmap,0,0,20,4);
+	// gp_coord x = 0;
+	// int text_height = gp_text_height(&p->text_style);
+	// gp_coord y =  gp_pixmap_h(p->pixmap) - (p->height * text_height);
+	// char string [p->width];
 	// int i = 0;
-	// int size_writes = p->fbdev_data_size / n_writes;
-	// for  (i =0 ; i  < n_writes; i++){
-		// write(p->fd, p->framebuf_fbdev + (i * size_writes ), size_writes);
+	// for (i = 0 ; i < p->height; i++){
+	// 	strncpy(string, p->framebuf_lcdproc + (i* p->width), p->width);
+	// 	gp_text(p->pixmap, &p->text_style, x, y, GP_ALIGN_RIGHT|GP_VALIGN_BELOW|GP_TEXT_BEARING, p->white_pixel, p->black_pixel, string);
+	// 	y +=  text_height;
 	// }
-		write(p->fd, p->framebuf_fbdev , p->fbdev_data_size);
+
+	int i  = write(p->fd, p->pixmap->pixels , p->fbdev_data_size);
+	if (i != 40960)
+		report(RPT_INFO, "Bytes writed %d",i);
 }
 
 
