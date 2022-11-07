@@ -575,7 +575,8 @@ dnl			else
 				AC_MSG_WARN([The ula200 driver needs the ftdi library])
 			fi
 			;;
-		viacast_lcd)
+		viacast_lcd)	
+			LIBS="$LIBS -lm"
 			DRIVERS="$DRIVERS viacast_lcd${SO}"
 			actdrivers=["$actdrivers viacast_lcd"]
 			;;

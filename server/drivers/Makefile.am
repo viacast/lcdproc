@@ -79,6 +79,7 @@ svga_LDADD =         @LIBSVGA@
 t6963_LDADD =        libLCD.a
 tyan_LDADD =         libLCD.a libbignum.a
 ula200_LDADD =       @LIBFTDI_LIBS@
+viacast_lcd_LDADD =  /usr/local/lib64/libgfxprim.a  /usr/local/lib64/libgfxprim-grabbers.a  /usr/local/lib64/libgfxprim-widgets.a /usr/local/lib64/libgfxprim-backends.a  /usr/local/lib64/libgfxprim-loaders.a
 xosd_LDADD =         @LIBXOSD_LIBS@ libbignum.a
 
 libLCD_a_SOURCES =   lcd_lib.h lcd_lib.c
@@ -146,6 +147,7 @@ xosd_SOURCES =       lcd.h xosdlib_drv.c xosdlib_drv.h adv_bignum.h
 yard2LCD_SOURCES =   lcd.h yard2LCD.c yard2LCD.h
 
 
-AM_CPPFLAGS = -I$(top_srcdir)
+AM_CPPFLAGS = -I$(top_srcdir) 
+AM_CPPFLAGS += -I/usr/local/include/gfxprim
 
 ## EOF
