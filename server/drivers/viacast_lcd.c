@@ -277,11 +277,30 @@ viacast_lcd_init(Driver *drvthis)
 	p->black_pixel = gp_rgb_to_pixmap_pixel(0x00, 0x00, 0x00, p->pixmap);
   p->white_pixel = gp_rgb_to_pixmap_pixel(0xff, 0xff, 0xff, p->pixmap);
   gp_text_style tmp_style = GP_DEFAULT_TEXT_STYLE;
-	const gp_font_family* font_family = gp_font_family_lookup("tiny");
-	tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
+	
+	
+	switch (p->rotate)
+	{
+	case (1):
+		const gp_font_family* font_family = gp_font_family_lookup("tiny");
+		tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
+		gp_pixmap_rotate_cw(p->pixmap);
+		break;
+	case (2):
+		gp_pixmap_rotate_cw(p->pixmap);
+		gp_pixmap_rotate_cw(p->pixmap);
+	case (3):
+		const gp_font_family* font_family = gp_font_family_lookup("tiny");
+		tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
+		gp_pixmap_rotate_ccw(p->pixmap);
+		break;
+	
+	default:
+		break;
+	}
+
 	p->text_style = tmp_style;	
 
-	gp_pixmap_rotate_cw(p->pixmap);
 
 
 	// if (p->rotate == 1){
