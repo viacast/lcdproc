@@ -7,6 +7,7 @@
 #define DEFAULT_ROTATE	0
 #define DEFAULT_KEYPAD_ROTATE	0
 #define DEFAULT_SIZE_LCDPROC		"20x4"
+#define DEFAULT_MARGIN_ALPHA  4
 
 MODULE_EXPORT int  viacast_lcd_init (Driver *drvthis);
 MODULE_EXPORT void viacast_lcd_close (Driver *drvthis);
