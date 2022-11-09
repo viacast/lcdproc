@@ -64,6 +64,7 @@ typedef struct text_private_data {
   int keypad_rotate;
 
   int resize;
+	int display_text;
   gp_pixmap *pixmap;
   gp_pixel black_pixel;
   gp_pixel white_pixel;
@@ -120,6 +121,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->fd = -1;
   p->fd_fbdev = -1;
   p->resize = 0;
+	p->display_text = 1;
   // p->cellwidth = DEFAULT_CELL_WIDTH;
   // p->cellheight = DEFAULT_CELL_HEIGHT;
   // p->ccmode = standard;
@@ -376,10 +378,10 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
         (gp_pixmap_w(p->pixmap) / gp_pixmap_h(p->pixmap)) *
             gp_pixmap_w(p->pixmap),
         GP_INTERP_NN, NULL);
-    
-		resized = gp_filter_rotate_180_alloc(resized, NULL);
-    
-		gp_fill(p->pixmap, p->black_pixel);
+
+    resized = gp_filter_rotate_180_alloc(resized, NULL);
+
+    gp_fill(p->pixmap, p->black_pixel);
     gp_blit_clipped(resized, 0, 0, gp_pixmap_w(resized), gp_pixmap_h(resized),
                     p->pixmap, 0,
                     gp_pixmap_h(p->pixmap) - gp_pixmap_h(resized));
@@ -415,12 +417,18 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
   }
   else if (!p->resize) {
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
-    for (i = 0; i < p->height; i++) {
-      strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
-      gp_text(p->pixmap, &p->text_style, x, y,
-              GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING,
-              p->white_pixel, p->black_pixel, string);
-      y += text_height;
+
+    if (p->display_text) {
+      gp_pixmap *subpixmap = gp_sub_pixmap_alloc(
+          p->pixmap, x, y - DEFAULT_MARGIN_ALPHA, gp_pixmap_w(p->pixmap), (p->height * text_height) + DEFAULT_MARGIN_ALPHA);
+      gp_filter_brightness(subpixmap, subpixmap, -0.5, NULL);
+      for (i = 0; i < p->height; i++) {
+        strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
+        gp_text(p->pixmap, &p->text_style, x, y,
+                GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING,
+                p->white_pixel, p->black_pixel, string);
+        y += text_height;
+      }
     }
     if (p->rotate == 2)
       p->pixmap = gp_filter_rotate_180_alloc(p->pixmap, NULL);
