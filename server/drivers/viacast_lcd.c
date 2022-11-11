@@ -334,7 +334,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     report(RPT_WARNING,
            "%s: KeyRepeatInterval must be between 0-3000; using default %d",
            drvthis->name, 300);
-    tmp = 300;
+    tmp = 700;
   }
   p->key_repeat_interval = tmp;
 
@@ -566,10 +566,19 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
     key_pressed = 0;
   }
 
+  if (!timerisset(p->key_wait_time)) {
+    gettimeofday(&current_time, NULL);
+    /* Set first timer */
+    delay_time.tv_sec = p->key_repeat_interval / 1000;
+    delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
+    timeradd(&current_time, &delay_time, p->key_wait_time);
+  }
+
   if (!key_pressed) {
     return NULL;
   }
 
+  gettimeofday(&current_time, NULL);
   /*
    * If a key has been pressed and it is not the same as in the previous
    * call to this function return that key string and start a timer. If
@@ -578,34 +587,19 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
    * interval timer and return that key.
    */
   if (index == p->pressed_index_key) {
-    if (timerisset(p->key_wait_time)) {
-      gettimeofday(&current_time, NULL);
-      if (timercmp(&current_time, p->key_wait_time, >)) {
-        /* Set timer for next key */
-        delay_time.tv_sec = p->key_repeat_interval / 1000;
-        delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
-        timeradd(&current_time, &delay_time, p->key_wait_time);
-      }
-      else {
-        return NULL;
-      }
-    }
-    else {
+    if (timercmp(&current_time, p->key_wait_time, <)) {
       return NULL;
     }
   }
-  else {
-    /* Set the time for repeated key press if enabled */
-    if (p->key_repeat_delay > 0) {
-      gettimeofday(&current_time, NULL);
-      delay_time.tv_sec = p->key_repeat_interval / 1000;
-      delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
-      timeradd(&current_time, &delay_time, p->key_wait_time);
-    }
-    report(RPT_DEBUG, "%s: New key pressed: %s", drvthis->name, KeyMap[index]);
-  }
 
-  
+  /* 
+   * Set new timer for debounce 
+   */
+  delay_time.tv_sec = p->key_repeat_interval / 1000;
+  delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
+  timeradd(&current_time, &delay_time, p->key_wait_time);
+
+  report(RPT_DEBUG, "%s: New key pressed: %s", drvthis->name, KeyMap[index]);
 
   p->pressed_index_key = index;
   return (KeyMap[index]);
