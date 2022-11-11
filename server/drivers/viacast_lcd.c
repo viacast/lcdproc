@@ -37,13 +37,15 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "lcd.h"
 #include "shared/report.h"
+#include "timing.h"
 #include "viacast_lcd.h"
 
-static char *directionKeyMap[4] = {"Down", "Left", "Up", "Right"};
+static char *KeyMap[6] = {"Down", "Left", "Up", "Right", "Enter", "Escape"};
 
 /** private data for the \c viacast_lcd driver */
 typedef struct text_private_data {
@@ -56,15 +58,23 @@ typedef struct text_private_data {
   char fbdev[200];
   int fbdev_bytes;
   int fbdev_data_size;
-  char *framebuf_fbdev;      /**< fram buffer /dev/fbdev*/
-  char *framebuf_fbdev_copy; /**< fram buffer /dev/fbdev*/
+  char *framebuf_fbdev; /**< fram buffer /dev/fbdev*/
   struct fb_var_screeninfo fb_info;
   int autorotate;
   int rotate;
   int keypad_rotate;
 
+  long timer;
+
+  struct timeval *key_wait_time; /**< Time until key auto repeat */
+  int key_repeat_delay;          /**< Time until first key repeat */
+  int key_repeat_interval;       /**< Time between auto repeated keys */
+
+  int pressed_index_key;
   int resize;
-	int display_text;
+  int display_text;
+  int hide_text;
+  int secs_hide_text;
   gp_pixmap *pixmap;
   gp_pixel black_pixel;
   gp_pixel white_pixel;
@@ -121,7 +131,10 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->fd = -1;
   p->fd_fbdev = -1;
   p->resize = 0;
-	p->display_text = 1;
+  p->display_text = 1;
+  p->hide_text = 1;
+  p->timer = 0;
+
   // p->cellwidth = DEFAULT_CELL_WIDTH;
   // p->cellheight = DEFAULT_CELL_HEIGHT;
   // p->ccmode = standard;
@@ -184,6 +197,18 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   /* Auto rotate? */
   p->autorotate = drvthis->config_get_bool(drvthis->name, "AutoRotate", 0, 0);
 
+  /* Hide text? */
+  p->hide_text = drvthis->config_get_bool(drvthis->name, "HideText", 0, 1);
+
+  /* Secs to hide text ?*/
+  tmp = drvthis->config_get_int(drvthis->name, "SecondsHideText", 0, 60);
+  if ((tmp > 120) || (tmp < 0)) {
+    report(RPT_WARNING,
+           "%s: Seconds to hide must be between 0 and 120; using default 60");
+    tmp = 60;
+  }
+  p->secs_hide_text = tmp;
+
   /* Which speed */
   tmp = drvthis->config_get_int(drvthis->name, "Speed", 0, DEFAULT_SPEED);
   if (tmp == 1200)
@@ -203,16 +228,6 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
         drvthis->name, DEFAULT_SPEED);
     speed = DEFAULT_SPEED;
   }
-
-  // /* New firmware version? */
-  // p->newfirmware = drvthis->config_get_bool(drvthis->name, "NewFirmware", 0,
-  // 0);
-
-  /* Reboot display? */
-  reboot = drvthis->config_get_bool(drvthis->name, "Reboot", 0, 0);
-
-  /* Am I USB or not? */
-  usb = drvthis->config_get_bool(drvthis->name, "USB", 0, 0);
 
   /* Set up io port correctly, and open it... */
   debug(RPT_DEBUG, "viacast_lcd: Opening device: %s", p->device);
@@ -295,6 +310,33 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
          p->fb_info.xres, p->fb_info.yres, p->fb_info.bits_per_pixel);
   sleep(1);
   report(RPT_DEBUG, "%s: init() done", drvthis->name);
+
+  /* Initialize delay */
+  if ((p->key_wait_time = malloc(sizeof(struct timeval))) == NULL) {
+    report(RPT_ERR, "%s: error allocating memory", drvthis->name);
+    return -1;
+  }
+  timerclear(p->key_wait_time);
+
+  /* Get key auto repeat delay */
+  tmp = drvthis->config_get_int(drvthis->name, "KeyRepeatDelay", 0, 500);
+  if (tmp < 0 || tmp > 3000) {
+    report(RPT_WARNING,
+           "%s: KeyRepeatDelay must be between 0-3000; using default %d",
+           drvthis->name, 500);
+    tmp = 500;
+  }
+  p->key_repeat_delay = tmp;
+
+  /* Get key auto repeat interval */
+  tmp = drvthis->config_get_int(drvthis->name, "KeyRepeatInterval", 0, 300);
+  if (tmp < 0 || tmp > 3000) {
+    report(RPT_WARNING,
+           "%s: KeyRepeatInterval must be between 0-3000; using default %d",
+           drvthis->name, 300);
+    tmp = 300;
+  }
+  p->key_repeat_interval = tmp;
 
   return 0;
 }
@@ -420,7 +462,8 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 
     if (p->display_text) {
       gp_pixmap *subpixmap = gp_sub_pixmap_alloc(
-          p->pixmap, x, y - DEFAULT_MARGIN_ALPHA, gp_pixmap_w(p->pixmap), (p->height * text_height) + DEFAULT_MARGIN_ALPHA);
+          p->pixmap, x, y - DEFAULT_MARGIN_ALPHA, gp_pixmap_w(p->pixmap),
+          (p->height * text_height) + DEFAULT_MARGIN_ALPHA);
       gp_filter_brightness(subpixmap, subpixmap, -0.5, NULL);
       for (i = 0; i < p->height; i++) {
         strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
@@ -473,39 +516,97 @@ MODULE_EXPORT void viacast_lcd_string(Driver *drvthis, int x, int y,
 MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
-  char key[128] = {'\0'};
-  read(p->fd, &key, 128);
+  char key = '\0';
+  read(p->fd, &key, 1);
+  int index = 0;
+  int key_pressed = 0;
+  struct timeval current_time, delay_time;
 
   if (p->autorotate) {
-    if (key[0] & 0b00000001) {
+    if (key & 0b00000001) {
       p->rotate = 0;
     }
-    if (key[0] & 0b00000010) {
+    if (key & 0b00000010) {
       p->rotate = 1;
     }
-    if (key[0] & 0b00000100) {
+    if (key & 0b00000100) {
       p->rotate = 2;
     }
-    if (key[0] & 0b0001000) {
+    if (key & 0b0001000) {
       p->rotate = 3;
     }
   }
 
-  switch (key[0]) {
+  switch (key) {
   case 'L':
-    return directionKeyMap[(0 + p->rotate + p->keypad_rotate) % 4];
+    index = (0 + p->rotate + p->keypad_rotate) % 4;
+    key_pressed = 1;
+    break;
   case 'U':
-    return directionKeyMap[(1 + p->rotate + p->keypad_rotate) % 4];
+    index = (1 + p->rotate + p->keypad_rotate) % 4;
+    key_pressed = 1;
+    break;
   case 'R':
-    return directionKeyMap[(2 + p->rotate + p->keypad_rotate) % 4];
+    index = (2 + p->rotate + p->keypad_rotate) % 4;
+    key_pressed = 1;
+    break;
   case 'D':
-    return directionKeyMap[(3 + p->rotate + p->keypad_rotate) % 4];
+    index = (3 + p->rotate + p->keypad_rotate) % 4;
+    key_pressed = 1;
+    break;
   case 'E':
-    return "Enter";
+    index = 4;
+    key_pressed = 1;
+    break;
   case 'C':
-    return "Escape";
+    index = 5;
+    key_pressed = 1;
+    break;
   default:
-    report(RPT_INFO, "%s: Untreated key 0x%02X", drvthis->name, key);
+    key_pressed = 0;
+  }
+
+  if (!key_pressed) {
     return NULL;
   }
+
+  /*
+   * If a key has been pressed and it is not the same as in the previous
+   * call to this function return that key string and start a timer. If
+   * it is the same, check if the timer has passed. If not (or the timer
+   * has been disabled) return no key string. Otherwise set the repeat
+   * interval timer and return that key.
+   */
+  if (index == p->pressed_index_key) {
+    if (timerisset(p->key_wait_time)) {
+      gettimeofday(&current_time, NULL);
+      if (timercmp(&current_time, p->key_wait_time, >)) {
+        /* Set timer for next key */
+        delay_time.tv_sec = p->key_repeat_interval / 1000;
+        delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
+        timeradd(&current_time, &delay_time, p->key_wait_time);
+      }
+      else {
+        return NULL;
+      }
+    }
+    else {
+      return NULL;
+    }
+  }
+  else {
+    /* Set the time for repeated key press if enabled */
+    if (p->key_repeat_delay > 0) {
+      gettimeofday(&current_time, NULL);
+      delay_time.tv_sec = p->key_repeat_interval / 1000;
+      delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
+      timeradd(&current_time, &delay_time, p->key_wait_time);
+    }
+    report(RPT_DEBUG, "%s: New key pressed: %s", drvthis->name, KeyMap[index]);
+  }
+
+  
+
+  p->pressed_index_key = index;
+  return (KeyMap[index]);
 }
