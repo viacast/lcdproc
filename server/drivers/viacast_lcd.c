@@ -66,9 +66,10 @@ typedef struct text_private_data {
 
   long timer;
 
-  struct timeval *key_wait_time; /**< Time until key auto repeat */
-  int key_repeat_delay;          /**< Time until first key repeat */
-  int key_repeat_interval;       /**< Time between auto repeated keys */
+  struct timeval *key_wait_time;     /**< Time until key auto repeat */
+  struct timeval *display_wait_time; /**< Time until key auto repeat */
+  int key_repeat_delay;              /**< Time until first key repeat */
+  int key_repeat_interval;           /**< Time between auto repeated keys */
 
   int pressed_index_key;
   int resize;
@@ -240,7 +241,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 
   tcgetattr(p->fd, &portset);
 
-  /* We use RAW mode */
+/* We use RAW mode */
 #ifdef HAVE_CFMAKERAW
   /* The easy way */
   cfmakeraw(&portset);
@@ -304,6 +305,11 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     else if (p->rotate == 3)
       gp_pixmap_rotate_ccw(p->pixmap);
   } while (0);
+
+  // const gp_font_family *font_family;
+  // font_family = gp_font_family_lookup("haxor_narrow_15");
+  // tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
+
   p->text_style = tmp_style;
 
   report(RPT_INFO, "Infos about fbdev\nwidth:%d\nheight:%d\nbits_per_pixel:%d",
@@ -317,6 +323,13 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     return -1;
   }
   timerclear(p->key_wait_time);
+
+  /* Initialize display time */
+  if ((p->display_wait_time = malloc(sizeof(struct timeval))) == NULL) {
+    report(RPT_ERR, "%s: error allocating memory", drvthis->name);
+    return -1;
+  }
+  timerclear(p->display_wait_time);
 
   /* Get key auto repeat delay */
   tmp = drvthis->config_get_int(drvthis->name, "KeyRepeatDelay", 0, 500);
@@ -334,7 +347,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     report(RPT_WARNING,
            "%s: KeyRepeatInterval must be between 0-3000; using default %d",
            drvthis->name, 300);
-    tmp = 700;
+    tmp = 300;
   }
   p->key_repeat_interval = tmp;
 
@@ -437,13 +450,15 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
   int i = 0;
 
   if (p->rotate == 1) {
+    x = gp_pixmap_w(p->pixmap);
+    x -= (p->text_style.font->max_glyph_width / 2);
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
     for (i = 0; i < p->height; i++) {
       strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
       revstr(string);
       gp_text(p->pixmap, &p->text_style, x, y,
-              GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING,
-              p->white_pixel, p->black_pixel, string);
+              GP_ALIGN_LEFT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+              p->black_pixel, string);
       y += text_height;
     }
   }
@@ -516,28 +531,32 @@ MODULE_EXPORT void viacast_lcd_string(Driver *drvthis, int x, int y,
 MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
-  char key = '\0';
-  read(p->fd, &key, 1);
+  char key[128] = {'\0'};
+  read(p->fd, &key, 128);
   int index = 0;
   int key_pressed = 0;
   struct timeval current_time, delay_time;
 
-  if (p->autorotate) {
-    if (key & 0b00000001) {
-      p->rotate = 0;
-    }
-    if (key & 0b00000010) {
-      p->rotate = 1;
-    }
-    if (key & 0b00000100) {
-      p->rotate = 2;
-    }
-    if (key & 0b0001000) {
-      p->rotate = 3;
-    }
+  gettimeofday(&current_time, NULL);
+  if (!timerisset(p->key_wait_time)) {
+    /* Set first timer */
+    delay_time.tv_sec = p->key_repeat_interval / 1000;
+    delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
+    timeradd(&current_time, &delay_time, p->key_wait_time);
   }
 
-  switch (key) {
+  if (!timerisset(p->display_wait_time)) {
+    /* Set first timer for display */
+    delay_time.tv_sec = p->secs_hide_text;
+    delay_time.tv_usec = 0;
+    timeradd(&current_time, &delay_time, p->display_wait_time);
+  }
+
+  if (timercmp(&current_time, p->key_wait_time, <)) {
+    return NULL;
+  }
+
+  switch (key[0]) {
   case 'L':
     index = (0 + p->rotate + p->keypad_rotate) % 4;
     key_pressed = 1;
@@ -566,38 +585,28 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
     key_pressed = 0;
   }
 
-  if (!timerisset(p->key_wait_time)) {
-    gettimeofday(&current_time, NULL);
-    /* Set first timer */
-    delay_time.tv_sec = p->key_repeat_interval / 1000;
-    delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
-    timeradd(&current_time, &delay_time, p->key_wait_time);
-  }
-
   if (!key_pressed) {
+    if ((p->display_text) && (timercmp(&current_time, p->display_wait_time, >)))
+      p->display_text = 0;
+
     return NULL;
   }
 
-  gettimeofday(&current_time, NULL);
-  /*
-   * If a key has been pressed and it is not the same as in the previous
-   * call to this function return that key string and start a timer. If
-   * it is the same, check if the timer has passed. If not (or the timer
-   * has been disabled) return no key string. Otherwise set the repeat
-   * interval timer and return that key.
-   */
-  if (index == p->pressed_index_key) {
-    if (timercmp(&current_time, p->key_wait_time, <)) {
-      return NULL;
-    }
-  }
-
-  /* 
-   * Set new timer for debounce 
-   */
+  // From here key pressed
+  // Set new timer for debounce
   delay_time.tv_sec = p->key_repeat_interval / 1000;
   delay_time.tv_usec = (p->key_repeat_interval % 1000) * 1000;
   timeradd(&current_time, &delay_time, p->key_wait_time);
+
+  // Set new timer for hide text
+  delay_time.tv_sec = p->secs_hide_text;
+  delay_time.tv_usec = 0;
+  timeradd(&current_time, &delay_time, p->display_wait_time);
+
+  if (!p->display_text) {
+    p->display_text = 1;
+    return NULL;
+  }
 
   report(RPT_DEBUG, "%s: New key pressed: %s", drvthis->name, KeyMap[index]);
 
