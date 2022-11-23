@@ -45,6 +45,20 @@
 #include "timing.h"
 #include "viacast_lcd.h"
 
+#define ValidX(x)                                                              \
+  if ((x) > p->width) {                                                        \
+    (x) = p->width;                                                            \
+  }                                                                            \
+  else                                                                         \
+    (x) = (x) < 1 ? 1 : (x);
+
+#define ValidY(y)                                                              \
+  if ((y) > p->height) {                                                       \
+    (y) = p->height;                                                           \
+  }                                                                            \
+  else                                                                         \
+    (y) = (y) < 1 ? 1 : (y);
+
 static char *KeyMap[6] = {"Down", "Left", "Up", "Right", "Enter", "Escape"};
 
 /** private data for the \c viacast_lcd driver */
@@ -305,11 +319,6 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     else if (p->rotate == 3)
       gp_pixmap_rotate_ccw(p->pixmap);
   } while (0);
-
-  // const gp_font_family *font_family;
-  // font_family = gp_font_family_lookup("haxor_narrow_15");
-  // tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
-
   p->text_style = tmp_style;
 
   report(RPT_INFO, "Infos about fbdev\nwidth:%d\nheight:%d\nbits_per_pixel:%d",
@@ -482,9 +491,11 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
       gp_filter_brightness(subpixmap, subpixmap, -0.5, NULL);
       for (i = 0; i < p->height; i++) {
         strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
+
         gp_text(p->pixmap, &p->text_style, x, y,
                 GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING,
                 p->white_pixel, p->black_pixel, string);
+
         y += text_height;
       }
     }
@@ -612,4 +623,80 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 
   p->pressed_index_key = index;
   return (KeyMap[index]);
+}
+
+/**
+ * Print a character on the screen at position (x,y).
+ * The upper-left corner is (1,1), the lower-right corner is (p->width,
+ * p->height). \param drvthis  Pointer to driver structure. \param x
+ * Horizontal character position (column). \param y        Vertical character
+ * position (row). \param c        Character that gets written.
+ */
+MODULE_EXPORT void viacast_lcd_chr(Driver *drvthis, int x, int y, char c)
+{
+  PrivateData *p = drvthis->private_data;
+
+  int offset;
+
+  ValidX(x);
+  ValidY(y);
+
+  y--;
+  x--;
+
+  offset = (y * p->width) + x;
+  p->framebuf_lcdproc[offset] = c;
+
+  report(RPT_DEBUG, "%s: writing icon initial position to position (%d,%d)",
+         __FUNCTION__, offset, y);
+}
+
+// /**
+//  * Place an icon on the screen.
+//  * \param drvthis  Pointer to driver structure.
+//  * \param x        Horizontal character position (column).
+//  * \param y        Vertical character position (row).
+//  * \param icon     synbolic value representing the icon.
+//  * \retval 0       Icon has been successfully defined/written.
+//  * \retval <0      Server core shall define/write the icon.
+//  */
+MODULE_EXPORT int viacast_lcd_icon(Driver *drvthis, int x, int y, int icon)
+{
+  PrivateData *p = drvthis->private_data;
+
+  switch (icon) {
+  case ICON_BLOCK_FILLED:
+    viacast_lcd_chr(drvthis, x, y, 0x1f);
+    break;
+  case ICON_ARROW_UP:
+    viacast_lcd_chr(drvthis, x, y, 0x1e);
+  	break;
+  case ICON_ARROW_DOWN:
+    viacast_lcd_chr(drvthis, x, y, 0x1d);
+  	break;
+  case ICON_ARROW_LEFT:
+    viacast_lcd_chr(drvthis, x, y, 0x17);
+  	break;
+  case ICON_ARROW_RIGHT:
+    viacast_lcd_chr(drvthis, x, y, 0x18);
+  	break;
+  case ICON_CHECKBOX_OFF:
+    viacast_lcd_chr(drvthis, x, y, 0x1a);
+  	break;
+  case ICON_CHECKBOX_ON:
+  	viacast_lcd_chr(drvthis, x, y, 0x19);
+  	break;
+  case ICON_SELECTOR_AT_LEFT:
+    viacast_lcd_chr(drvthis, x, y, 0x16);
+  	break;
+  case ICON_SELECTOR_AT_RIGHT:
+    viacast_lcd_chr(drvthis, x, y, 0x15);
+  	break;
+  case ICON_CHECKBOX_GRAY:
+    viacast_lcd_chr(drvthis, x, y, 0x1b);
+  	break;
+  default:
+    return -1; /* Let the core do other icons */
+  }
+  return 0;
 }
