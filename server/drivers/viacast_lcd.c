@@ -41,6 +41,7 @@
 #include <unistd.h>
 
 #include "lcd.h"
+#include "lcd_lib.h"
 #include "shared/report.h"
 #include "timing.h"
 #include "viacast_lcd.h"
@@ -65,6 +66,8 @@ static char *KeyMap[6] = {"Down", "Left", "Up", "Right", "Enter", "Escape"};
 typedef struct text_private_data {
   char device[200];
   int fd;
+  int speed;
+  int bytes_wrote;
   int fd_fbdev;
   int width;              /**< display width in characters */
   int height;             /**< display height in characters */
@@ -104,7 +107,84 @@ MODULE_EXPORT char *symbol_prefix = "viacast_lcd_";
 
 // Internal functions
 static void viacast_lcd_init_fbdev(Driver *drvthis);
+static void viacast_lcd_setup_device(Driver *drvthis);
+void viacast_lcd_setup_gfxprim(Driver * drvthis);
+static int is_valid_fd(int fd);
 static void revestr(char *str1);
+
+void viacast_lcd_setup_device(Driver *drvthis)
+{
+  PrivateData *p = drvthis->private_data;
+  struct termios portset;
+
+  /* Set up io port correctly, and open it... */
+  debug(RPT_DEBUG, "viacast_lcd: Opening device: %s", p->device);
+
+  while (1) {
+    p->fd = open(p->device, O_RDWR | O_NOCTTY | O_SYNC);
+    if (p->fd == -1) {
+      report(RPT_ERR, "%s: open(%s) failed (%s)", drvthis->name, p->device,
+             strerror(errno));
+      sleep(1);
+      continue;
+    }
+    break;
+  }
+
+
+  tcgetattr(p->fd, &portset);
+
+/* We use RAW mode */
+#ifdef HAVE_CFMAKERAW
+  /* The easy way */
+  cfmakeraw(&portset);
+#else
+  /* The hard way */
+  portset.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR |
+                       ICRNL | IXON | IXOFF | IXANY);
+  portset.c_oflag &= ~OPOST;
+  portset.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+  portset.c_cflag &= ~(CSIZE | PARENB | CRTSCTS);
+  portset.c_cflag |= CS8 | CREAD | CLOCAL;
+#endif
+  portset.c_cc[VMIN] = 0;
+  portset.c_cc[VTIME] = 0;
+
+  /* Set port speed */
+  cfsetospeed(&portset, p->speed);
+  cfsetispeed(&portset, p->speed);
+
+  /* Do it... */
+  tcsetattr(p->fd, TCSANOW, &portset);
+
+  p->bytes_wrote = 0;
+}
+
+void viacast_lcd_setup_gfxprim(Driver * drvthis){
+
+  PrivateData *p = drvthis->private_data;
+
+  gp_pixmap_set_rotation(p->pixmap, 0, 0, 0);
+  gp_text_style tmp_style = GP_DEFAULT_TEXT_STYLE;
+
+
+  /* Set rotations and font*/
+  do {
+    if (!p->resize)
+      break;
+
+    const gp_font_family *font_family;
+    font_family = gp_font_family_lookup("tiny");
+    tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
+
+    if (p->rotate == 1)
+      gp_pixmap_rotate_cw(p->pixmap);
+    else if (p->rotate == 3)
+      gp_pixmap_rotate_ccw(p->pixmap);
+  } while (0);
+  p->text_style = tmp_style;
+
+}
 
 void revstr(char *str1)
 {
@@ -126,11 +206,9 @@ void revstr(char *str1)
  */
 MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 {
-  struct termios portset;
   int tmp, w, h;
   int reboot = 0;
   int usb = 0;
-  int speed = DEFAULT_SPEED;
   char size[200] = DEFAULT_SIZE_LCDPROC;
 
   PrivateData *p;
@@ -149,6 +227,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->display_text = 1;
   p->hide_text = 1;
   p->timer = 0;
+  p->speed = DEFAULT_SPEED;
 
   // p->cellwidth = DEFAULT_CELL_WIDTH;
   // p->cellheight = DEFAULT_CELL_HEIGHT;
@@ -227,56 +306,24 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   /* Which speed */
   tmp = drvthis->config_get_int(drvthis->name, "Speed", 0, DEFAULT_SPEED);
   if (tmp == 1200)
-    speed = B1200;
+    p->speed = B1200;
   else if (tmp == 2400)
-    speed = B2400;
+    p->speed = B2400;
   else if (tmp == 9600)
-    speed = B9600;
+    p->speed = B9600;
   else if (tmp == 19200)
-    speed = B19200;
+    p->speed = B19200;
   else if (tmp == 115200)
-    speed = B115200;
+    p->speed = B115200;
   else {
     report(
         RPT_WARNING,
         "%s: Speed must be 1200, 2400, 9600, 19200 or 115200; using default %d",
         drvthis->name, DEFAULT_SPEED);
-    speed = DEFAULT_SPEED;
+    p->speed = DEFAULT_SPEED;
   }
 
-  /* Set up io port correctly, and open it... */
-  debug(RPT_DEBUG, "viacast_lcd: Opening device: %s", p->device);
-  p->fd = open(p->device, O_RDWR | O_NOCTTY | O_SYNC);
-  if (p->fd == -1) {
-    report(RPT_ERR, "%s: open(%s) failed (%s)", drvthis->name, p->device,
-           strerror(errno));
-    return -1;
-  }
-
-  tcgetattr(p->fd, &portset);
-
-/* We use RAW mode */
-#ifdef HAVE_CFMAKERAW
-  /* The easy way */
-  cfmakeraw(&portset);
-#else
-  /* The hard way */
-  portset.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR |
-                       ICRNL | IXON | IXOFF | IXANY);
-  portset.c_oflag &= ~OPOST;
-  portset.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
-  portset.c_cflag &= ~(CSIZE | PARENB | CRTSCTS);
-  portset.c_cflag |= CS8 | CREAD | CLOCAL;
-#endif
-  portset.c_cc[VMIN] = 0;
-  portset.c_cc[VTIME] = 0;
-
-  /* Set port speed */
-  cfsetospeed(&portset, speed);
-  cfsetispeed(&portset, speed);
-
-  /* Do it... */
-  tcsetattr(p->fd, TCSANOW, &portset);
+  viacast_lcd_setup_device(drvthis);
 
   /* make sure the frame buffer of lcdproc is there... */
   p->framebuf_lcdproc = malloc(p->width * p->height);
@@ -301,30 +348,14 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   /* Information about pixmap */
   p->pixmap =
       gp_pixmap_alloc(p->fb_info.xres, p->fb_info.yres, GP_PIXEL_RGB565);
+
   p->black_pixel = gp_rgb_to_pixmap_pixel(0x00, 0x00, 0x00, p->pixmap);
   p->white_pixel = gp_rgb_to_pixmap_pixel(0xff, 0xff, 0xff, p->pixmap);
-  gp_text_style tmp_style = GP_DEFAULT_TEXT_STYLE;
 
-  /* Set rotations and font*/
-  do {
-    if (!p->resize)
-      break;
-
-    const gp_font_family *font_family;
-    font_family = gp_font_family_lookup("tiny");
-    tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
-
-    if (p->rotate == 1)
-      gp_pixmap_rotate_cw(p->pixmap);
-    else if (p->rotate == 3)
-      gp_pixmap_rotate_ccw(p->pixmap);
-  } while (0);
-  p->text_style = tmp_style;
+  viacast_lcd_setup_gfxprim(drvthis);
 
   report(RPT_INFO, "Infos about fbdev\nwidth:%d\nheight:%d\nbits_per_pixel:%d",
          p->fb_info.xres, p->fb_info.yres, p->fb_info.bits_per_pixel);
-  sleep(1);
-  report(RPT_DEBUG, "%s: init() done", drvthis->name);
 
   /* Initialize delay */
   if ((p->key_wait_time = malloc(sizeof(struct timeval))) == NULL) {
@@ -359,6 +390,9 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     tmp = 300;
   }
   p->key_repeat_interval = tmp;
+
+  sleep(1);
+  report(RPT_DEBUG, "%s: init() done", drvthis->name);
 
   return 0;
 }
@@ -422,6 +456,10 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
   PrivateData *p = drvthis->private_data;
 
   memset(p->framebuf_lcdproc, ' ', p->width * p->height);
+
+
+  if (p->bytes_wrote < 0)
+    viacast_lcd_setup_device(drvthis);
 }
 
 /**
@@ -431,6 +469,7 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
 MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
+
 
   p->framebuf_fbdev =
       mmap(0, p->fbdev_data_size, PROT_READ, MAP_SHARED, p->fd_fbdev, (off_t)0);
@@ -503,7 +542,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
       p->pixmap = gp_filter_rotate_180_alloc(p->pixmap, NULL);
   }
 
-  write(p->fd, p->pixmap->pixels, p->fbdev_data_size);
+  p->bytes_wrote = write(p->fd, p->pixmap->pixels, p->fbdev_data_size);
 }
 
 /**
@@ -670,33 +709,102 @@ MODULE_EXPORT int viacast_lcd_icon(Driver *drvthis, int x, int y, int icon)
     break;
   case ICON_ARROW_UP:
     viacast_lcd_chr(drvthis, x, y, 0x1e);
-  	break;
+    break;
   case ICON_ARROW_DOWN:
     viacast_lcd_chr(drvthis, x, y, 0x1d);
-  	break;
+    break;
   case ICON_ARROW_LEFT:
     viacast_lcd_chr(drvthis, x, y, 0x17);
-  	break;
+    break;
   case ICON_ARROW_RIGHT:
     viacast_lcd_chr(drvthis, x, y, 0x18);
-  	break;
+    break;
   case ICON_CHECKBOX_OFF:
     viacast_lcd_chr(drvthis, x, y, 0x1a);
-  	break;
+    break;
   case ICON_CHECKBOX_ON:
-  	viacast_lcd_chr(drvthis, x, y, 0x19);
-  	break;
+    viacast_lcd_chr(drvthis, x, y, 0x19);
+    break;
   case ICON_SELECTOR_AT_LEFT:
     viacast_lcd_chr(drvthis, x, y, 0x16);
-  	break;
+    break;
   case ICON_SELECTOR_AT_RIGHT:
     viacast_lcd_chr(drvthis, x, y, 0x15);
-  	break;
+    break;
   case ICON_CHECKBOX_GRAY:
     viacast_lcd_chr(drvthis, x, y, 0x1b);
-  	break;
+    break;
   default:
     return -1; /* Let the core do other icons */
   }
   return 0;
+}
+
+/**
+ * Draw a horizontal bar to the right.
+ * \param drvthis  Pointer to driver structure.
+ * \param x        Horizontal character position (column) of the starting point.
+ * \param y        Vertical character position (row) of the starting point.
+ * \param len      Number of characters that the bar is long at 100%
+ * \param promille Current length level of the bar in promille.
+ * \param options  Options (currently unused).
+ */
+MODULE_EXPORT void viacast_lcd_hbar(Driver *drvthis, int x, int y, int len,
+                                    int promille, int options)
+{
+  PrivateData *p = drvthis->private_data;
+
+  lib_hbar_static(drvthis, x, y, len, promille, options, 5, 0x0f);
+}
+
+/**
+ * Draw a vertical bar bottom-up.
+ * \param drvthis  Pointer to driver structure.
+ * \param x        Horizontal character position (column) of the starting point.
+ * \param y        Vertical character position (row) of the starting point.
+ * \param len      Number of characters that the bar is high at 100%
+ * \param promille Current height level of the bar in promille.
+ * \param options  Options (currently unused).
+ */
+MODULE_EXPORT void viacast_lcd_vbar(Driver *drvthis, int x, int y, int len,
+                                    int promille, int options)
+{
+  PrivateData *p = drvthis->private_data;
+
+  lib_vbar_static(drvthis, x, y, len, promille, options, 5, 0x0a);
+}
+
+/**
+ * Retrieve rotate
+ * \param drvthis  Pointer to driver structure.
+ * \return Stored rotate in promille.
+ */
+MODULE_EXPORT int viacast_lcd_get_rotate(Driver *drvthis)
+{
+  PrivateData *p = drvthis->private_data;
+
+  return p->rotate;
+}
+
+/**
+ * Set rotate
+ * \param drvthis  Pointer to driver structure.
+ * \param rotate Set new rotate 
+ */
+MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate)
+{
+  PrivateData *p = drvthis->private_data;
+
+  if ((rotate < 0 ) || (rotate > 3))
+    return;
+
+
+  if ((rotate == 1 ) || (rotate == 3)){
+    p->resize = 1;
+  } else {
+    p->resize = 0;
+  }
+
+  p->rotate = rotate;
+  viacast_lcd_setup_gfxprim(drvthis);
 }
