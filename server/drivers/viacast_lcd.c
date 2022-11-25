@@ -537,6 +537,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 
         y += text_height;
       }
+      gp_pixmap_free(subpixmap);
     }
     if (p->rotate == 2)
       p->pixmap = gp_filter_rotate_180_alloc(p->pixmap, NULL);
