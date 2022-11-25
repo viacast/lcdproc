@@ -76,6 +76,7 @@ MenuEventFunc(backlight_handler);
 MenuEventFunc(titlespeed_handler);
 MenuEventFunc(contrast_handler);
 MenuEventFunc(brightness_handler);
+MenuEventFunc(rotate_handler);
 
 int
 menuscreens_init(void)
@@ -488,6 +489,7 @@ menuscreen_create_menu(void)
 	Menu *driver_menu;
 	MenuItem *checkbox;
 	MenuItem *slider;
+	MenuItem *ring;
 	Driver *driver;
 
 	debug(RPT_DEBUG, "%s()", __FUNCTION__);
@@ -543,7 +545,10 @@ menuscreen_create_menu(void)
 		int contrast_avail = (driver->get_contrast && driver->set_contrast) ? 1 : 0;
 		int brightness_avail = (driver->get_brightness && driver->set_brightness) ? 1 : 0;
 
-		if (contrast_avail || brightness_avail) {
+		int rotate_avail = (driver->get_rotate && driver->set_rotate) ? 1 : 0;
+
+
+		if (contrast_avail || brightness_avail || rotate_avail) {
 			/* menu's client is NULL since we're in the server */
 			driver_menu = menu_create(driver->name, NULL, driver->name, NULL);
 			if (driver_menu == NULL) {
@@ -573,6 +578,13 @@ menuscreen_create_menu(void)
 								NULL, "min", "max", 0, 1000, 25, offbrightness);
 				menu_add_item(driver_menu, slider);
 			}
+			if (rotate_avail){
+				int rotate = driver->get_rotate(driver);
+
+				ring = menuitem_create_ring("rotate", rotate_handler, "Rotate", NULL, "0 deg\t90 deg\t180 deg\t270 deg", rotate);
+				menu_add_item(driver_menu, ring);
+			}
+
 		}
 	}
 }
@@ -732,6 +744,28 @@ MenuEventFunc(brightness_handler)
 			else if (strcmp(item->id, "offbrightness") == 0) {
 				driver->set_brightness(driver, BACKLIGHT_OFF, item->data.slider.value);
 			}
+		}
+	}
+	return 0;
+}
+
+MenuEventFunc(rotate_handler)
+{
+	debug(RPT_DEBUG, "%s(item=[%s], event=%d)", __FUNCTION__,
+	      ((item != NULL) ? item->id : "(null)"), event);
+
+	/*
+	 * This function can be called by one of several drivers that support
+	 * rotate !
+	 */
+	if ((item != NULL) && ((event == MENUEVENT_UPDATE)))  {
+		/* Determine the driver by following the menu's association */
+		Driver *driver = item->parent->data.menu.association;
+
+		if (driver != NULL) {
+			driver->set_rotate(driver, item->data.ring.value);
+			report(RPT_INFO, "Menu: set rotate of [%.40s] to %d",
+			       driver->name, item->data.ring.value);
 		}
 	}
 	return 0;

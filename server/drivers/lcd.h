@@ -176,6 +176,9 @@ typedef struct lcd_logical_driver {
 	void (*backlight)	(struct lcd_logical_driver *drvthis, int on);
 	void (*output)		(struct lcd_logical_driver *drvthis, int state);
 
+	int (*get_rotate) (struct lcd_logical_driver *drvthis);
+	void (*set_rotate)	(struct lcd_logical_driver *drvthis, int rotate);
+
 	/* informational functions */
 	const char * (*get_info) (struct lcd_logical_driver *drvthis);
 
