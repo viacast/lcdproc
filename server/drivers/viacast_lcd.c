@@ -108,7 +108,7 @@ MODULE_EXPORT char *symbol_prefix = "viacast_lcd_";
 // Internal functions
 static void viacast_lcd_init_fbdev(Driver *drvthis);
 static void viacast_lcd_setup_device(Driver *drvthis);
-void viacast_lcd_setup_gfxprim(Driver * drvthis);
+void viacast_lcd_setup_gfxprim(Driver *drvthis);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
@@ -130,7 +130,6 @@ void viacast_lcd_setup_device(Driver *drvthis)
     }
     break;
   }
-
 
   tcgetattr(p->fd, &portset);
 
@@ -156,17 +155,15 @@ void viacast_lcd_setup_device(Driver *drvthis)
 
   /* Do it... */
   tcsetattr(p->fd, TCSANOW, &portset);
-
-  p->bytes_wrote = 0;
 }
 
-void viacast_lcd_setup_gfxprim(Driver * drvthis){
+void viacast_lcd_setup_gfxprim(Driver *drvthis)
+{
 
   PrivateData *p = drvthis->private_data;
 
   gp_pixmap_set_rotation(p->pixmap, 0, 0, 0);
   gp_text_style tmp_style = GP_DEFAULT_TEXT_STYLE;
-
 
   /* Set rotations and font*/
   do {
@@ -183,7 +180,6 @@ void viacast_lcd_setup_gfxprim(Driver * drvthis){
       gp_pixmap_rotate_ccw(p->pixmap);
   } while (0);
   p->text_style = tmp_style;
-
 }
 
 void revstr(char *str1)
@@ -394,6 +390,14 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   sleep(1);
   report(RPT_DEBUG, "%s: init() done", drvthis->name);
 
+  p->framebuf_fbdev =
+      mmap(0, p->fbdev_data_size, PROT_READ, MAP_SHARED, p->fd_fbdev, (off_t)0);
+
+  if (p->framebuf_fbdev == MAP_FAILED) {
+    perror("Mmap:");
+    return -1 ;
+  }
+
   return 0;
 }
 
@@ -416,11 +420,18 @@ MODULE_EXPORT void viacast_lcd_close(Driver *drvthis)
       free(p->framebuf_lcdproc);
     p->framebuf_lcdproc = NULL;
 
+    if (p->pixmap)
+      free(p->pixmap);
+    p->pixmap = NULL;
+
     if (p->framebuf_fbdev)
       free(p->framebuf_fbdev);
     p->framebuf_fbdev = NULL;
 
     free(p);
+
+    munmap(p->framebuf_fbdev, p->fbdev_data_size);
+
   }
   drvthis->store_private_ptr(drvthis, NULL);
 }
@@ -456,10 +467,12 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
   PrivateData *p = drvthis->private_data;
 
   memset(p->framebuf_lcdproc, ' ', p->width * p->height);
-
+  // memset(p->framebuf_fbdev, ' ' , p->fbdev_data_size);
 
   if (p->bytes_wrote < 0)
     viacast_lcd_setup_device(drvthis);
+
+  p->bytes_wrote = 0;
 }
 
 /**
@@ -471,8 +484,6 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
   PrivateData *p = drvthis->private_data;
 
 
-  p->framebuf_fbdev =
-      mmap(0, p->fbdev_data_size, PROT_READ, MAP_SHARED, p->fd_fbdev, (off_t)0);
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
 
   if (p->resize) {
@@ -637,9 +648,18 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
   }
 
   if (!key_pressed) {
-    if ((p->display_text) && (timercmp(&current_time, p->display_wait_time, >)))
-      p->display_text = 0;
+    do {
+      if (!p->display_text)
+        break;
 
+      if (p->resize)
+        break;
+
+      if (timercmp(&current_time, p->display_wait_time, <))
+        break;
+
+      p->display_text = 0;
+    } while (0);
     return NULL;
   }
 
@@ -790,19 +810,19 @@ MODULE_EXPORT int viacast_lcd_get_rotate(Driver *drvthis)
 /**
  * Set rotate
  * \param drvthis  Pointer to driver structure.
- * \param rotate Set new rotate 
+ * \param rotate Set new rotate
  */
 MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate)
 {
   PrivateData *p = drvthis->private_data;
 
-  if ((rotate < 0 ) || (rotate > 3))
+  if ((rotate < 0) || (rotate > 3))
     return;
 
-
-  if ((rotate == 1 ) || (rotate == 3)){
+  if ((rotate == 1) || (rotate == 3)) {
     p->resize = 1;
-  } else {
+  }
+  else {
     p->resize = 0;
   }
 
