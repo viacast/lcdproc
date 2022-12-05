@@ -22,6 +22,7 @@ MODULE_EXPORT void viacast_lcd_backlight (Driver *drvthis, int on);
 MODULE_EXPORT const char * viacast_lcd_get_info (Driver *drvthis);
 
 MODULE_EXPORT const char * viacast_lcd_get_key(Driver *drvthis);
+MODULE_EXPORT const char * viacast_lcd_get_pretty_name(Driver *drvthis);
 
 
 #endif

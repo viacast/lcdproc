@@ -829,3 +829,8 @@ MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate)
   p->rotate = rotate;
   viacast_lcd_setup_gfxprim(drvthis);
 }
+
+MODULE_EXPORT const char *viacast_lcd_get_pretty_name(Driver *drvthis)
+{
+  return "Viacast";
+}
