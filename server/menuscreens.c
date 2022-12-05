@@ -550,7 +550,14 @@ menuscreen_create_menu(void)
 
 		if (contrast_avail || brightness_avail || rotate_avail) {
 			/* menu's client is NULL since we're in the server */
-			driver_menu = menu_create(driver->name, NULL, driver->name, NULL);
+			int pretty_name_avail = (driver->get_pretty_name) ? 1 : 0;
+
+			if (pretty_name_avail){
+				driver_menu = menu_create(driver->name, NULL, driver->get_pretty_name(driver), NULL);
+			} else {
+				driver_menu = menu_create(driver->name, NULL, driver->name, NULL);
+			}
+
 			if (driver_menu == NULL) {
 				report(RPT_ERR, "%s: Cannot create menu for driver %s",
 				       __FUNCTION__, driver->name);
