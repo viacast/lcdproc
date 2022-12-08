@@ -34,6 +34,11 @@
 #define ALL_OUTPUTS_ON -1
 #define ALL_OUTPUTS_OFF 0
 
+#define COLOR_OFF	0x00 			// 0 0000
+#define COLOR_GREEN	0x01 		// 0 0001
+#define COLOR_RED 0x10 			// 1 0000
+#define COLOR_AMBER 0x11		// 1 0001
+
 /**
  * Sets the state of the output port (such as on MtxOrb LCDs)
  *
@@ -44,55 +49,102 @@
 int
 output_func(Client *c, int argc, char **argv)
 {
+
+	int out;
+	int byte_color=0;
+	int index=0;
+
 	if (c->state != ACTIVE)
 		return 1;
 
-	if (argc != 2) {
-		sock_send_error(c->sock, "Usage: output {on|off|<num>}\n");
+	if ((argc == 1) || (argc > 3)) 
+	{
+		sock_send_error(c->sock, "Usage: output {on|off|<num>} or output led1 green \n");
 		return 0;
 	}
 
-	if (0 == strcmp(argv[1], "on"))
-		output_state = ALL_OUTPUTS_ON;
-	else if (0 == strcmp(argv[1], "off"))
-		output_state = ALL_OUTPUTS_OFF;
-	else {
-		long out;
-		char *endptr;
+	if (argc == 3)
+	{
 
-		/* Note that there is no valid range set for
-		 * output_state; thus a value in the 12 digits
-		 * is not considered out of range.
-		 */
+		int r = sscanf(argv[1], "led%d", &index);
 
-		/* set errno to be able to detect errors in strtol() */
-		errno = 0;
-
-		out = strtol(argv[1], &endptr, 0);
-
-		if (errno) {
-			sock_printf_error(c->sock, "number argument: %s\n", strerror(errno));
-			return 0;
-		}
-		else if ((*argv[1] != '\0') && (*endptr == '\0')) {
-			output_state = out;
-		}
-		else {
+		if ((r == EOF) || (index > 4 ) || (index < 1)) {
 			sock_send_error(c->sock, "invalid parameter...\n");
 			return 0;
 		}
+
+		index -= 1;
+		
+		if(0 == strcmp(argv[2], "off"))
+			byte_color = COLOR_OFF;
+		else if(0 == strcmp(argv[2], "green"))
+			byte_color = COLOR_GREEN;
+		else if(0 == strcmp(argv[2], "red"))
+			byte_color = COLOR_RED;
+		else if(0 == strcmp(argv[2], "amber"))
+			byte_color = COLOR_AMBER;
+		else{
+			sock_send_error(c->sock, "Usage: output {on|off|<num>} or output led<n> <color> [green, red, amber, off] \n");
+      return 0;
+    }
+
+		out = output_state;
+		out &= ~(1UL << index);
+		out &= ~(1UL << (index + 4));
+		out |= byte_color << index;
+
+		sock_printf_error(c->sock, "succes was %d setted to %d.\n",out,output_state);
+		report(RPT_NOTICE, "output states changed");
+		
+		output_state = out;
+		return 0;
 	}
 
-	sock_send_string(c->sock, "success\n");
+	if (argc == 2)
+	{
 
-	/* Makes sense to me to set the output immediately;
-	 * however, the outputs are currently set in
-	 * draw_screen(screen *s, int timer)
-	 * Whatever for? */
+		if (0 == strcmp(argv[1], "on"))
+			output_state = ALL_OUTPUTS_ON;
+		else if (0 == strcmp(argv[1], "off"))
+			output_state = ALL_OUTPUTS_OFF;
+		else {
+			char *endptr;
 
-	/* drivers_output(output_state); */
+			/* Note that there is no valid range set for
+			 * output_state; thus a value in the 12 digits
+			 * is not considered out of range.
+			 */
 
-	report(RPT_NOTICE, "output states changed");
+			/* set errno to be able to detect errors in strtol() */
+			errno = 0;
+
+			out = strtol(argv[1], &endptr, 0);
+
+			if (errno) {
+				sock_printf_error(c->sock, "number argument: %s\n", strerror(errno));
+				return 0;
+			}
+			else if ((*argv[1] != '\0') && (*endptr == '\0')) {
+				output_state = out;
+			}
+			else {
+				sock_send_error(c->sock, "invalid parameter...\n");
+				return 0;
+			}
+		}
+
+		sock_send_string(c->sock, "success\n");
+
+		/* Makes sense to me to set the output immediately;
+		 * however, the outputs are currently set in
+		 * draw_screen(screen *s, int timer)
+		 * Whatever for? */
+
+		/* drivers_output(output_state); */
+
+		report(RPT_NOTICE, "output states changed");
+		return 0;
+	}
 	return 0;
 }
 
