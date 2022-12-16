@@ -339,7 +339,6 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   ioctl(p->fd_fbdev, FBIOGET_VSCREENINFO, &p->fb_info);
   p->fbdev_bytes = p->fb_info.bits_per_pixel / 8;
   p->fbdev_data_size = p->fb_info.xres * p->fb_info.yres * p->fbdev_bytes;
-  p->framebuf_fbdev = malloc(p->fbdev_data_size);
 
   /* Information about pixmap */
   p->pixmap =
@@ -424,13 +423,10 @@ MODULE_EXPORT void viacast_lcd_close(Driver *drvthis)
       free(p->pixmap);
     p->pixmap = NULL;
 
-    if (p->framebuf_fbdev)
-      free(p->framebuf_fbdev);
-    p->framebuf_fbdev = NULL;
+    munmap(p->framebuf_fbdev, p->fbdev_data_size);
 
     free(p);
 
-    munmap(p->framebuf_fbdev, p->fbdev_data_size);
 
   }
   drvthis->store_private_ptr(drvthis, NULL);
