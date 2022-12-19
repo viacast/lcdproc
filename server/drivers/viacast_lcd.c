@@ -203,8 +203,6 @@ void revstr(char *str1)
 MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 {
   int tmp, w, h;
-  int reboot = 0;
-  int usb = 0;
   char size[200] = DEFAULT_SIZE_LCDPROC;
 
   PrivateData *p;
@@ -715,8 +713,6 @@ MODULE_EXPORT void viacast_lcd_chr(Driver *drvthis, int x, int y, char c)
 //  */
 MODULE_EXPORT int viacast_lcd_icon(Driver *drvthis, int x, int y, int icon)
 {
-  PrivateData *p = drvthis->private_data;
-
   switch (icon) {
   case ICON_BLOCK_FILLED:
     viacast_lcd_chr(drvthis, x, y, 0x1f);
@@ -766,8 +762,6 @@ MODULE_EXPORT int viacast_lcd_icon(Driver *drvthis, int x, int y, int icon)
 MODULE_EXPORT void viacast_lcd_hbar(Driver *drvthis, int x, int y, int len,
                                     int promille, int options)
 {
-  PrivateData *p = drvthis->private_data;
-
   lib_hbar_static(drvthis, x, y, len, promille, options, 5, 0x0f);
 }
 
@@ -783,8 +777,6 @@ MODULE_EXPORT void viacast_lcd_hbar(Driver *drvthis, int x, int y, int len,
 MODULE_EXPORT void viacast_lcd_vbar(Driver *drvthis, int x, int y, int len,
                                     int promille, int options)
 {
-  PrivateData *p = drvthis->private_data;
-
   lib_vbar_static(drvthis, x, y, len, promille, options, 5, 0x0a);
 }
 
