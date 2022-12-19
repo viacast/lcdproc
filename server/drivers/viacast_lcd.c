@@ -394,7 +394,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 
   if (p->framebuf_fbdev == MAP_FAILED) {
     perror("Mmap:");
-    return -1 ;
+    return -1;
   }
 
   return 0;
@@ -426,8 +426,6 @@ MODULE_EXPORT void viacast_lcd_close(Driver *drvthis)
     munmap(p->framebuf_fbdev, p->fbdev_data_size);
 
     free(p);
-
-
   }
   drvthis->store_private_ptr(drvthis, NULL);
 }
@@ -478,7 +476,6 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
 MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
-
 
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
 
