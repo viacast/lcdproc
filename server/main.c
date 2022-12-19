@@ -570,6 +570,7 @@ install_signal_handlers(int allow_reload)
 	sigaction(SIGINT, &sa, NULL);		/* Ctrl-C will cause a clean exit...*/
 	sigaction(SIGTERM, &sa, NULL);		/* and "kill"...*/
 
+	allow_reload = 1;
 	if (allow_reload) {
 		sa.sa_handler = catch_reload_signal;
 		/* On SIGHUP reread config and restart the drivers ! */
