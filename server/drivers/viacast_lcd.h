@@ -1,6 +1,7 @@
 #ifndef VIACAST_LCD_H
 #define VIACAST_LCD_H
 
+#define NO_DEVICE         ""
 #define DEFAULT_DEVICE		"/dev/ttyACM0"
 #define DEFAULT_FBDEV		"/dev/fb0"
 #define DEFAULT_SPEED		B115200

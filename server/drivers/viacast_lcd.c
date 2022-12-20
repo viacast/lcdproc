@@ -60,14 +60,17 @@
   else                                                                         \
     (y) = (y) < 1 ? 1 : (y);
 
+#define MAX_DEVICES 2
+
 static char *KeyMap[6] = {"Down", "Left", "Up", "Right", "Enter", "Escape"};
 
 /** private data for the \c viacast_lcd driver */
 typedef struct text_private_data {
-  char device[200];
-  int fd;
+  char device[MAX_DEVICES][200];
+  int fd[MAX_DEVICES];
+  int bytes_wrote[MAX_DEVICES];
+  int has_device;
   int speed;
-  int bytes_wrote;
   int fd_fbdev;
   int width;              /**< display width in characters */
   int height;             /**< display height in characters */
@@ -107,31 +110,27 @@ MODULE_EXPORT char *symbol_prefix = "viacast_lcd_";
 
 // Internal functions
 static void viacast_lcd_init_fbdev(Driver *drvthis);
-static void viacast_lcd_setup_device(Driver *drvthis);
+static void viacast_lcd_setup_device(Driver *drvthis, int index);
 void viacast_lcd_setup_gfxprim(Driver *drvthis);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
-void viacast_lcd_setup_device(Driver *drvthis)
+void viacast_lcd_setup_device(Driver *drvthis, int index)
 {
   PrivateData *p = drvthis->private_data;
   struct termios portset;
 
   /* Set up io port correctly, and open it... */
-  debug(RPT_DEBUG, "viacast_lcd: Opening device: %s", p->device);
+  debug(RPT_DEBUG, "viacast_lcd: Opening device: %s", p->device[index]);
 
-  while (1) {
-    p->fd = open(p->device, O_RDWR | O_NOCTTY | O_SYNC);
-    if (p->fd == -1) {
-      report(RPT_ERR, "%s: open(%s) failed (%s)", drvthis->name, p->device,
-             strerror(errno));
-      sleep(1);
-      continue;
-    }
-    break;
+  p->fd[index] = open(p->device[index], O_RDWR | O_NOCTTY | O_SYNC);
+  if (p->fd[index] == -1) {
+    report(RPT_ERR, "%s: open(%s) failed (%s)", drvthis->name, p->device[index],
+           strerror(errno));
+    return;
   }
 
-  tcgetattr(p->fd, &portset);
+  tcgetattr(p->fd[index], &portset);
 
 /* We use RAW mode */
 #ifdef HAVE_CFMAKERAW
@@ -154,7 +153,7 @@ void viacast_lcd_setup_device(Driver *drvthis)
   cfsetispeed(&portset, p->speed);
 
   /* Do it... */
-  tcsetattr(p->fd, TCSANOW, &portset);
+  tcsetattr(p->fd[index], TCSANOW, &portset);
 }
 
 void viacast_lcd_setup_gfxprim(Driver *drvthis)
@@ -215,8 +214,12 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     return -1;
 
   /* Initialize the PrivateData structure */
-  p->fd = -1;
+  int i = 0;
+
+  for (i = 0; i < MAX_DEVICES; i++)
+    p->fd[i] = -1;
   p->fd_fbdev = -1;
+  p->has_device = 0;
   p->resize = 0;
   p->display_text = 1;
   p->hide_text = 1;
@@ -231,12 +234,18 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 
   /* Read config file */
   /* Which device should be used */
-  strncpy(
-      p->device,
-      drvthis->config_get_string(drvthis->name, "Device", 0, DEFAULT_DEVICE),
-      sizeof(p->device));
-  p->device[sizeof(p->device) - 1] = '\0';
-  report(RPT_INFO, "%s: using Device %s", drvthis->name, p->device);
+
+  for (i = 0; i < MAX_DEVICES; i++) {
+    strncpy(p->device[i],
+            drvthis->config_get_string(drvthis->name, "Device", i, NO_DEVICE),
+            sizeof(p->device[i]));
+    if (strcmp(p->device[i], NO_DEVICE) == 0) {
+      continue;
+    }
+    p->has_device |= 1 << i;
+    p->device[i][sizeof(p->device) - 1] = '\0';
+    report(RPT_INFO, "%s: using Device %s", drvthis->name, p->device[i]);
+  }
 
   /* Which fbdev should be used */
   strncpy(p->fbdev,
@@ -317,8 +326,10 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     p->speed = DEFAULT_SPEED;
   }
 
-  viacast_lcd_setup_device(drvthis);
-
+  for (i = 0; i < MAX_DEVICES; i++) {
+    if (p->has_device & 1 << i)
+      viacast_lcd_setup_device(drvthis, i);
+  }
   /* make sure the frame buffer of lcdproc is there... */
   p->framebuf_lcdproc = malloc(p->width * p->height);
   if (p->framebuf_lcdproc == NULL) {
@@ -407,8 +418,10 @@ MODULE_EXPORT void viacast_lcd_close(Driver *drvthis)
   PrivateData *p = drvthis->private_data;
 
   if (p != NULL) {
-    if (p->fd >= 0)
-      close(p->fd);
+    int i = 0;
+    for (i = 0; i < MAX_DEVICES; i++)
+      if (p->fd[i] >= 0)
+        close(p->fd[i]);
 
     if (p->fd_fbdev >= 0)
       close(p->fd_fbdev);
@@ -461,10 +474,14 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
   memset(p->framebuf_lcdproc, ' ', p->width * p->height);
   // memset(p->framebuf_fbdev, ' ' , p->fbdev_data_size);
 
-  if (p->bytes_wrote < 0)
-    viacast_lcd_setup_device(drvthis);
-
-  p->bytes_wrote = 0;
+  int i = 0;
+  for (i = 0; i < MAX_DEVICES; i++) {
+    if (!(p->has_device & 1 << i))
+      continue;
+    if (p->bytes_wrote[i] < 0)
+      viacast_lcd_setup_device(drvthis, i);
+    p->bytes_wrote[i] = 0;
+  }
 }
 
 /**
@@ -529,7 +546,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
       gp_pixmap *subpixmap = gp_sub_pixmap_alloc(
           p->pixmap, x, y - DEFAULT_MARGIN_ALPHA, gp_pixmap_w(p->pixmap),
           (p->height * text_height) + DEFAULT_MARGIN_ALPHA);
-      gp_filter_brightness(subpixmap, subpixmap, -0.5, NULL);
+      gp_filter_brightness(subpixmap, subpixmap, -0.2, NULL);
       for (i = 0; i < p->height; i++) {
         strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
 
@@ -545,7 +562,9 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
       p->pixmap = gp_filter_rotate_180_alloc(p->pixmap, NULL);
   }
 
-  p->bytes_wrote = write(p->fd, p->pixmap->pixels, p->fbdev_data_size);
+  for (i = 0; i < MAX_DEVICES; i++) {
+    p->bytes_wrote[i] = write(p->fd[i], p->pixmap->pixels, p->fbdev_data_size);
+  }
 }
 
 /**
@@ -584,8 +603,8 @@ MODULE_EXPORT void viacast_lcd_string(Driver *drvthis, int x, int y,
 MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
-  char key[128] = {'\0'};
-  read(p->fd, &key, 128);
+  char key[MAX_DEVICES][128] = {{0}};
+  int i = 0;
   int index = 0;
   int key_pressed = 0;
   struct timeval current_time, delay_time;
@@ -605,37 +624,46 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
     timeradd(&current_time, &delay_time, p->display_wait_time);
   }
 
-  if (timercmp(&current_time, p->key_wait_time, <)) {
-    return NULL;
+  for (i = 0; i < MAX_DEVICES; i++) {
+
+    if (!(p->has_device & 1 << i)) {
+      continue;
+    }
+
+    int r = read(p->fd[i], &key[i], 128);
+
+    switch (key[i][0]) {
+    case 'L':
+      index = (0 + p->rotate + p->keypad_rotate) % 4;
+      key_pressed |= 1 << i;
+      break;
+    case 'U':
+      index = (1 + p->rotate + p->keypad_rotate) % 4;
+      key_pressed |= 1 << i;
+      break;
+    case 'R':
+      index = (2 + p->rotate + p->keypad_rotate) % 4;
+      key_pressed |= 1 << i;
+      break;
+    case 'D':
+      index = (3 + p->rotate + p->keypad_rotate) % 4;
+      key_pressed |= 1 << i;
+      break;
+    case 'E':
+      index = 4;
+      key_pressed |= 1 << i;
+      break;
+    case 'C':
+      index = 5;
+      key_pressed |= 1 << i;
+      break;
+    default:
+      break;
+    }
   }
 
-  switch (key[0]) {
-  case 'L':
-    index = (0 + p->rotate + p->keypad_rotate) % 4;
-    key_pressed = 1;
-    break;
-  case 'U':
-    index = (1 + p->rotate + p->keypad_rotate) % 4;
-    key_pressed = 1;
-    break;
-  case 'R':
-    index = (2 + p->rotate + p->keypad_rotate) % 4;
-    key_pressed = 1;
-    break;
-  case 'D':
-    index = (3 + p->rotate + p->keypad_rotate) % 4;
-    key_pressed = 1;
-    break;
-  case 'E':
-    index = 4;
-    key_pressed = 1;
-    break;
-  case 'C':
-    index = 5;
-    key_pressed = 1;
-    break;
-  default:
-    key_pressed = 0;
+  if (timercmp(&current_time, p->key_wait_time, <)) {
+    return NULL;
   }
 
   if (!key_pressed) {
@@ -643,6 +671,7 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
       if (!p->display_text)
         break;
 
+      // lcd rotate is always displayed
       if (p->resize)
         break;
 
@@ -669,8 +698,6 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
     p->display_text = 1;
     return NULL;
   }
-
-  report(RPT_DEBUG, "%s: New key pressed: %s", drvthis->name, KeyMap[index]);
 
   p->pressed_index_key = index;
   return (KeyMap[index]);
