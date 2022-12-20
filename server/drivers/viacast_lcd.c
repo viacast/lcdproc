@@ -251,7 +251,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   strncpy(p->fbdev,
           drvthis->config_get_string(drvthis->name, "Fbdev", 0, DEFAULT_FBDEV),
           sizeof(p->fbdev));
-  p->fbdev[sizeof(p->device) - 1] = '\0';
+  p->fbdev[sizeof(p->fbdev) - 1] = '\0';
   report(RPT_INFO, "%s: using fbdev %s", drvthis->name, p->fbdev);
 
   /* Which size */
