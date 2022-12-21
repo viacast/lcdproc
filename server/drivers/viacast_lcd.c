@@ -60,7 +60,7 @@
   else                                                                         \
     (y) = (y) < 1 ? 1 : (y);
 
-#define MAX_DEVICES 2
+#define MAX_DEVICES 4
 
 static char *KeyMap[6] = {"Down", "Left", "Up", "Right", "Enter", "Escape"};
 
@@ -110,12 +110,12 @@ MODULE_EXPORT char *symbol_prefix = "viacast_lcd_";
 
 // Internal functions
 static void viacast_lcd_init_fbdev(Driver *drvthis);
-static void viacast_lcd_setup_device(Driver *drvthis, int index);
+static int viacast_lcd_setup_device(Driver *drvthis, int index);
 void viacast_lcd_setup_gfxprim(Driver *drvthis);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
-void viacast_lcd_setup_device(Driver *drvthis, int index)
+int  viacast_lcd_setup_device(Driver *drvthis, int index)
 {
   PrivateData *p = drvthis->private_data;
   struct termios portset;
@@ -127,7 +127,7 @@ void viacast_lcd_setup_device(Driver *drvthis, int index)
   if (p->fd[index] == -1) {
     report(RPT_ERR, "%s: open(%s) failed (%s)", drvthis->name, p->device[index],
            strerror(errno));
-    return;
+    return -1;
   }
 
   tcgetattr(p->fd[index], &portset);
@@ -154,6 +154,7 @@ void viacast_lcd_setup_device(Driver *drvthis, int index)
 
   /* Do it... */
   tcsetattr(p->fd[index], TCSANOW, &portset);
+  return 0;
 }
 
 void viacast_lcd_setup_gfxprim(Driver *drvthis)
@@ -242,7 +243,6 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     if (strcmp(p->device[i], NO_DEVICE) == 0) {
       continue;
     }
-    p->has_device |= 1 << i;
     p->device[i][sizeof(p->device) - 1] = '\0';
     report(RPT_INFO, "%s: using Device %s", drvthis->name, p->device[i]);
   }
@@ -326,10 +326,17 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     p->speed = DEFAULT_SPEED;
   }
 
+  int n_loaded_devices = 0;
   for (i = 0; i < MAX_DEVICES; i++) {
-    if (p->has_device & 1 << i)
-      viacast_lcd_setup_device(drvthis, i);
+      if (viacast_lcd_setup_device(drvthis, i) == 0){
+        p->has_device |= 1 << i;
+        n_loaded_devices++;
+      }
   }
+
+  if (n_loaded_devices == 0)
+    return -1;
+
   /* make sure the frame buffer of lcdproc is there... */
   p->framebuf_lcdproc = malloc(p->width * p->height);
   if (p->framebuf_lcdproc == NULL) {
@@ -405,7 +412,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     perror("Mmap:");
     return -1;
   }
-
+  
   return 0;
 }
 
@@ -479,7 +486,8 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
     if (!(p->has_device & 1 << i))
       continue;
     if (p->bytes_wrote[i] < 0)
-      viacast_lcd_setup_device(drvthis, i);
+      if(viacast_lcd_setup_device(drvthis, i) < 0)
+        p->has_device &= 0 << i;
     p->bytes_wrote[i] = 0;
   }
 }
