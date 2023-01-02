@@ -79,7 +79,7 @@ svga_LDADD =         @LIBSVGA@
 t6963_LDADD =        libLCD.a
 tyan_LDADD =         libLCD.a libbignum.a
 ula200_LDADD =       @LIBFTDI_LIBS@
-viacast_lcd_LDADD =  libLCD.a /usr/local/lib64/libgfxprim.a  /usr/local/lib64/libgfxprim-grabbers.a  /usr/local/lib64/libgfxprim-widgets.a /usr/local/lib64/libgfxprim-backends.a  /usr/local/lib64/libgfxprim-loaders.a
+viacast_lcd_LDADD =  libLCD.a
 xosd_LDADD =         @LIBXOSD_LIBS@ libbignum.a
 
 libLCD_a_SOURCES =   lcd_lib.h lcd_lib.c
@@ -141,7 +141,7 @@ t6963_SOURCES =      lcd.h lcd_lib.h t6963.c t6963.h glcd_font5x8.h t6963_low.h 
 text_SOURCES =       lcd.h text.h text.c
 tyan_SOURCES =       lcd.h lcd_lib.h tyan_lcdm.h tyan_lcdm.c adv_bignum.h
 ula200_SOURCES =     lcd.h adv_bignum.h ula200.h ula200.c
-viacast_lcd_SOURCES = lcd.h lcd_lib.h viacast_lcd.h viacast_lcd.c
+viacast_lcd_SOURCES = lcd.h lcd_lib.h viacast_lcd.h viacast_lcd.c viacast_lcd_utils.c viacast_lcd_utils.h
 vlsys_m428_SOURCES = lcd.h vlsys_m428.c vlsys_m428.h
 xosd_SOURCES =       lcd.h xosdlib_drv.c xosdlib_drv.h adv_bignum.h
 yard2LCD_SOURCES =   lcd.h yard2LCD.c yard2LCD.h

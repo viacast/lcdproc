@@ -576,7 +576,7 @@ dnl			else
 			fi
 			;;
 		viacast_lcd)	
-			LIBS="$LIBS -lm"
+			LIBS="$LIBS -lm -lrt -lgfxprim -lgfxprim-loaders -ljpeg"
 			DRIVERS="$DRIVERS viacast_lcd${SO}"
 			actdrivers=["$actdrivers viacast_lcd"]
 			;;
