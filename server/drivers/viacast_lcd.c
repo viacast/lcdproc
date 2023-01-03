@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <gfxprim/gfxprim.h>
+#include <gfxprim/loaders/gp_loaders.h>
 #include <gfxprim/text/gp_fonts.h>
 #include <gfxprim/text/gp_text_style.h>
 #include <linux/fb.h>
@@ -45,6 +46,7 @@
 #include "shared/report.h"
 #include "timing.h"
 #include "viacast_lcd.h"
+#include "viacast_lcd_utils.h"
 
 #define ValidX(x)                                                              \
   if ((x) > p->width) {                                                        \
@@ -61,6 +63,7 @@
     (y) = (y) < 1 ? 1 : (y);
 
 #define MAX_DEVICES 4
+#define MAX_ICONS 4
 
 static char *KeyMap[6] = {"Down", "Left", "Up", "Right", "Enter", "Escape"};
 
@@ -85,6 +88,10 @@ typedef struct text_private_data {
   int keypad_rotate;
 
   long timer;
+  int fd_inotify;
+  int scandir;
+  int wd;
+  struct inotify_event *event;
 
   struct timeval *key_wait_time;     /**< Time until key auto repeat */
   struct timeval *display_wait_time; /**< Time until key auto repeat */
@@ -112,10 +119,11 @@ MODULE_EXPORT char *symbol_prefix = "viacast_lcd_";
 static void viacast_lcd_init_fbdev(Driver *drvthis);
 static int viacast_lcd_setup_device(Driver *drvthis, int index);
 void viacast_lcd_setup_gfxprim(Driver *drvthis);
+void check_inotify(Driver *drvthis);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
-int  viacast_lcd_setup_device(Driver *drvthis, int index)
+int viacast_lcd_setup_device(Driver *drvthis, int index)
 {
   PrivateData *p = drvthis->private_data;
   struct termios portset;
@@ -180,6 +188,31 @@ void viacast_lcd_setup_gfxprim(Driver *drvthis)
       gp_pixmap_rotate_ccw(p->pixmap);
   } while (0);
   p->text_style = tmp_style;
+}
+
+void check_inotify(Driver *drvthis)
+{
+
+  PrivateData *p = drvthis->private_data;
+
+  char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+
+  ssize_t len = read(p->fd_inotify, buf, sizeof(buf));
+  if (len == -1 && errno != EAGAIN) {
+    report(RPT_ERR, "Error on read fd inotify");
+    exit(EXIT_FAILURE);
+  }
+
+  if (len > 0) {
+
+    for (char *ptr = buf; ptr < buf + len;
+         ptr += sizeof(struct inotify_event) + p->event->len) {
+
+      p->event = (const struct inotify_event *)ptr;
+
+      displayInotifyEvent(p->event, &p->scandir);
+    }
+  }
 }
 
 void revstr(char *str1)
@@ -328,10 +361,10 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 
   int n_loaded_devices = 0;
   for (i = 0; i < MAX_DEVICES; i++) {
-      if (viacast_lcd_setup_device(drvthis, i) == 0){
-        p->has_device |= 1 << i;
-        n_loaded_devices++;
-      }
+    if (viacast_lcd_setup_device(drvthis, i) == 0) {
+      p->has_device |= 1 << i;
+      n_loaded_devices++;
+    }
   }
 
   if (n_loaded_devices == 0)
@@ -402,9 +435,6 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   }
   p->key_repeat_interval = tmp;
 
-  sleep(1);
-  report(RPT_DEBUG, "%s: init() done", drvthis->name);
-
   p->framebuf_fbdev =
       mmap(0, p->fbdev_data_size, PROT_READ, MAP_SHARED, p->fd_fbdev, (off_t)0);
 
@@ -412,7 +442,26 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     perror("Mmap:");
     return -1;
   }
-  
+
+  /*Config iontify*/
+  p->scandir = 1;
+
+  p->fd_inotify = inotify_init1(IN_NONBLOCK);
+  if (p->fd_inotify == -1) {
+    report(RPT_NOTICE, "Cant create inotify");
+    return -1;
+  }
+
+  p->wd = inotify_add_watch(p->fd_inotify, "/tmp/status_bar/",
+                            IN_CREATE | IN_DELETE | IN_MODIFY);
+  if (p->wd == -1) {
+    report(RPT_NOTICE, "Cant create watch descriptor");
+    return -1;
+  }
+
+  report(RPT_INFO, "%s: init() done", drvthis->name);
+  sleep(1);
+
   return 0;
 }
 
@@ -486,7 +535,7 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
     if (!(p->has_device & 1 << i))
       continue;
     if (p->bytes_wrote[i] < 0)
-      if(viacast_lcd_setup_device(drvthis, i) < 0)
+      if (viacast_lcd_setup_device(drvthis, i) < 0)
         p->has_device &= 0 << i;
     p->bytes_wrote[i] = 0;
   }
@@ -578,9 +627,11 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 /**
  * Print a string on the screen at position (x,y).
  * The upper-left corner is (1,1), the lower-right corner is (p->width,
- * p->height). \param drvthis  Pointer to driver structure. \param x Horizontal
- * character position (column). \param y        Vertical character position
- * (row). \param string   String that gets written.
+ * p->height).
+ * \param drvthis  Pointer to driver structure.
+ * \param x        Horizontal character position (column).
+ * \param y        Vertical character position (row).
+ * \param string   String that gets written.
  */
 MODULE_EXPORT void viacast_lcd_string(Driver *drvthis, int x, int y,
                                       const char string[])
@@ -714,9 +765,11 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 /**
  * Print a character on the screen at position (x,y).
  * The upper-left corner is (1,1), the lower-right corner is (p->width,
- * p->height). \param drvthis  Pointer to driver structure. \param x
- * Horizontal character position (column). \param y        Vertical character
- * position (row). \param c        Character that gets written.
+ * p->height).
+ * \param drvthis  Pointer to driver structure.
+ * \param x Horizontal character position (column).
+ * \param y        Vertical character position (row).
+ * \param c        Character that gets written.
  */
 MODULE_EXPORT void viacast_lcd_chr(Driver *drvthis, int x, int y, char c)
 {
@@ -737,15 +790,15 @@ MODULE_EXPORT void viacast_lcd_chr(Driver *drvthis, int x, int y, char c)
          __FUNCTION__, offset, y);
 }
 
-// /**
-//  * Place an icon on the screen.
-//  * \param drvthis  Pointer to driver structure.
-//  * \param x        Horizontal character position (column).
-//  * \param y        Vertical character position (row).
-//  * \param icon     synbolic value representing the icon.
-//  * \retval 0       Icon has been successfully defined/written.
-//  * \retval <0      Server core shall define/write the icon.
-//  */
+/**
+ * Place an icon on the screen.
+ * \param drvthis  Pointer to driver structure.
+ * \param x        Horizontal character position (column).
+ * \param y        Vertical character position (row).
+ * \param icon     synbolic value representing the icon.
+ * \retval 0       Icon has been successfully defined/written.
+ * \retval <0      Server core shall define/write the icon.
+ */
 MODULE_EXPORT int viacast_lcd_icon(Driver *drvthis, int x, int y, int icon)
 {
   switch (icon) {
