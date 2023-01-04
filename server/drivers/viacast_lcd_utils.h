@@ -6,4 +6,4 @@
 
 int filter(const struct dirent *name);
 
-void displayInotifyEvent(struct inotify_event *i, int *rescan);
+void check_inotify_event(struct inotify_event *i, int *reload_icons);

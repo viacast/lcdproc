@@ -88,8 +88,11 @@ typedef struct text_private_data {
   int keypad_rotate;
 
   long timer;
+
+  struct dirent **icons_list;
+  int reload_icons;
+  int n_icons;
   int fd_inotify;
-  int scandir;
   int wd;
   struct inotify_event *event;
 
@@ -104,6 +107,7 @@ typedef struct text_private_data {
   int hide_text;
   int secs_hide_text;
   gp_pixmap *pixmap;
+  gp_pixmap **icon;
   gp_pixel black_pixel;
   gp_pixel white_pixel;
   gp_text_style text_style;
@@ -120,6 +124,7 @@ static void viacast_lcd_init_fbdev(Driver *drvthis);
 static int viacast_lcd_setup_device(Driver *drvthis, int index);
 void viacast_lcd_setup_gfxprim(Driver *drvthis);
 void check_inotify(Driver *drvthis);
+int reload_icons(Driver *drvthis);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
@@ -210,9 +215,51 @@ void check_inotify(Driver *drvthis)
 
       p->event = (const struct inotify_event *)ptr;
 
-      displayInotifyEvent(p->event, &p->scandir);
+      check_inotify_event(p->event, &p->reload_icons);
     }
   }
+}
+
+int reload_icons(Driver *drvthis)
+{
+  PrivateData *p = drvthis->private_data;
+
+  destroy_icons(drvthis);
+
+  char fullpath[1024];
+  const char *directory_scan = "/tmp/status_bar/";
+
+  int n = scandir(directory_scan, &p->icons_list, filter, alphasort);
+  if (n == -1) {
+    perror("scandir");
+    return n;
+  }
+
+  p->icon = (gp_pixmap *)malloc(sizeof(gp_pixmap) * n);
+
+  int i = 0;
+  for (i = 0; i < n; i++) {
+    sprintf(fullpath, "%s%s", directory_scan, p->icons_list[i]->d_name);
+    p->icon[i] = gp_load_png(fullpath, NULL);
+  }
+
+  return n;
+}
+
+int destroy_icons(Driver *drvthis)
+{
+  PrivateData *p = drvthis->private_data;
+
+  int i = 0 ;
+
+  for ( i=0; i < p->n_icons; i++){
+    if (p->icon[i])
+      gp_pixmap_free(p->icon[i]);
+  }
+
+  if (p->icon)
+    free(p->icon);
+
 }
 
 void revstr(char *str1)
@@ -444,7 +491,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   }
 
   /*Config iontify*/
-  p->scandir = 1;
+  p->reload_icons = 1;
 
   p->fd_inotify = inotify_init1(IN_NONBLOCK);
   if (p->fd_inotify == -1) {
@@ -453,7 +500,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   }
 
   p->wd = inotify_add_watch(p->fd_inotify, "/tmp/status_bar/",
-                            IN_CREATE | IN_DELETE | IN_MODIFY);
+                            IN_ALL_EVENTS);
   if (p->wd == -1) {
     report(RPT_NOTICE, "Cant create watch descriptor");
     return -1;
@@ -549,6 +596,12 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
 
+  check_inotify(drvthis);
+  if (p->reload_icons) {
+    p->n_icons = reload_icons(drvthis);
+    p->reload_icons = 0;
+  }
+
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
 
   if (p->resize) {
@@ -599,11 +652,31 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
   else if (!p->resize) {
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
 
+    int status_bar = 1;
+    if (status_bar) {
+      gp_coord coordx = 0;
+      gp_filter_brightness_ex(p->pixmap, 0, 0, gp_pixmap_w(p->pixmap), 14,
+                              p->pixmap, 0, 0, -0.3, NULL);
+      for (i = 0; i < p->n_icons; i++) {
+
+        if (!p->icon[i])
+          continue;
+        
+        if ( (gp_pixmap_w(p->icon[i]) + coordx ) > gp_pixmap_w(p->pixmap))
+          continue;
+
+        gp_blit_clipped(p->icon[i], 0, 0, gp_pixmap_w(p->icon[i]),
+                        gp_pixmap_h(p->icon[i]), p->pixmap, coordx, 1);
+
+        coordx += gp_pixmap_w(p->icon[i]);
+      }
+    }
+
     if (p->display_text) {
       gp_filter_brightness_ex(
           p->pixmap, x, y - DEFAULT_MARGIN_ALPHA, gp_pixmap_w(p->pixmap),
           (p->height * text_height) + DEFAULT_MARGIN_ALPHA, p->pixmap, x,
-          y - DEFAULT_MARGIN_ALPHA, -0.2, NULL);
+          y - DEFAULT_MARGIN_ALPHA, -0.6, NULL);
 
       for (i = 0; i < p->height; i++) {
         strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
