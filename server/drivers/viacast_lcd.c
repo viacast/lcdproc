@@ -600,10 +600,11 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
 
     if (p->display_text) {
-      gp_pixmap *subpixmap = gp_sub_pixmap_alloc(
+      gp_filter_brightness_ex(
           p->pixmap, x, y - DEFAULT_MARGIN_ALPHA, gp_pixmap_w(p->pixmap),
-          (p->height * text_height) + DEFAULT_MARGIN_ALPHA);
-      gp_filter_brightness(subpixmap, subpixmap, -0.2, NULL);
+          (p->height * text_height) + DEFAULT_MARGIN_ALPHA, p->pixmap, x,
+          y - DEFAULT_MARGIN_ALPHA, -0.2, NULL);
+
       for (i = 0; i < p->height; i++) {
         strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
 
@@ -613,7 +614,6 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 
         y += text_height;
       }
-      gp_pixmap_free(subpixmap);
     }
     if (p->rotate == 2)
       p->pixmap = gp_filter_rotate_180_alloc(p->pixmap, NULL);
