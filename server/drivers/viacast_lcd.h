@@ -8,7 +8,11 @@
 #define DEFAULT_ROTATE	0
 #define DEFAULT_KEYPAD_ROTATE	0
 #define DEFAULT_SIZE_LCDPROC		"20x4"
+#define DEFAULT_ALPHA_BG  -0.4
 #define DEFAULT_MARGIN_ALPHA  4
+#define DEFAULT_HEIGHT_ICON  16
+#define DEFAULT_V_SPACE_ICON 2
+#define DEFAULT_H_SPACE_ICON 2
 
 MODULE_EXPORT int  viacast_lcd_init (Driver *drvthis);
 MODULE_EXPORT void viacast_lcd_close (Driver *drvthis);

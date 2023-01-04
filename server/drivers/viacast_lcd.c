@@ -640,6 +640,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
     }
   }
   else if (p->rotate == 3) {
+    
     y = (p->height * text_height);
     for (i = 0; i < p->height; i++) {
       strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
@@ -654,21 +655,22 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 
     int status_bar = 1;
     if (status_bar) {
-      gp_coord coordx = 0;
-      gp_filter_brightness_ex(p->pixmap, 0, 0, gp_pixmap_w(p->pixmap), 14,
+      gp_coord coordx = DEFAULT_H_SPACE_ICON;
+      gp_coord coordy = DEFAULT_V_SPACE_ICON;
+      gp_filter_brightness_ex(p->pixmap, 0, 0, gp_pixmap_w(p->pixmap), DEFAULT_HEIGHT_ICON + (2*DEFAULT_V_SPACE_ICON),
                               p->pixmap, 0, 0, -0.3, NULL);
       for (i = 0; i < p->n_icons; i++) {
 
         if (!p->icon[i])
           continue;
-        
-        if ( (gp_pixmap_w(p->icon[i]) + coordx ) > gp_pixmap_w(p->pixmap))
+       
+        if ( (gp_pixmap_w(p->icon[i]) + coordx + DEFAULT_H_SPACE_ICON) > gp_pixmap_w(p->pixmap))
           continue;
 
         gp_blit_clipped(p->icon[i], 0, 0, gp_pixmap_w(p->icon[i]),
-                        gp_pixmap_h(p->icon[i]), p->pixmap, coordx, 1);
+                        gp_pixmap_h(p->icon[i]), p->pixmap, coordx, coordy);
 
-        coordx += gp_pixmap_w(p->icon[i]);
+        coordx += gp_pixmap_w(p->icon[i]) + DEFAULT_H_SPACE_ICON;
       }
     }
 
