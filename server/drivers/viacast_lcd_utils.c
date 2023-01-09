@@ -4,6 +4,8 @@ int filter(const struct dirent *name)
 {
   if (name->d_type != DT_REG)
     return 0;
+
+  return 1;
 }
 
 void /* Display information from inotify_event structure */

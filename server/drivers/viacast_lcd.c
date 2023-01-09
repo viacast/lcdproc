@@ -125,6 +125,7 @@ static int viacast_lcd_setup_device(Driver *drvthis, int index);
 void viacast_lcd_setup_gfxprim(Driver *drvthis);
 void check_inotify(Driver *drvthis);
 int reload_icons(Driver *drvthis);
+void destroy_icons(Driver *drvthis);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
@@ -213,7 +214,7 @@ void check_inotify(Driver *drvthis)
     for (char *ptr = buf; ptr < buf + len;
          ptr += sizeof(struct inotify_event) + p->event->len) {
 
-      p->event = (const struct inotify_event *)ptr;
+      p->event = (struct inotify_event *)ptr;
 
       check_inotify_event(p->event, &p->reload_icons);
     }
@@ -235,7 +236,7 @@ int reload_icons(Driver *drvthis)
     return n;
   }
 
-  p->icon = (gp_pixmap *)malloc(sizeof(gp_pixmap) * n);
+  p->icon = (gp_pixmap **)malloc(sizeof(gp_pixmap*) * n);
 
   int i = 0;
   for (i = 0; i < n; i++) {
@@ -246,7 +247,7 @@ int reload_icons(Driver *drvthis)
   return n;
 }
 
-int destroy_icons(Driver *drvthis)
+void destroy_icons(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
 
@@ -765,6 +766,8 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
     }
 
     int r = read(p->fd[i], &key[i], 128);
+    if (r <= 0)
+      continue;
 
     switch (key[i][0]) {
     case 'L':
