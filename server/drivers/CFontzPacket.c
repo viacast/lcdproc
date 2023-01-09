@@ -48,6 +48,7 @@
 #include "CFontz633io.h"
 #include "shared/report.h"
 #include "lcd_lib.h"
+#include "timing.h"
 #include "CFontz-charmap.h"
 #include "adv_bignum.h"
 
@@ -57,6 +58,7 @@
 /* Constants for userdefchar_mode */
 #define NUM_CCs		8 /* max. number of custom characters */
 
+static char *KeyMap[6] = {"Up", "Down", "Left", "Right", "Enter", "Escape"};
 
 /** private data for the \c CFontzPacket driver */
 typedef struct CFontzPacket_private_data {
@@ -85,6 +87,10 @@ typedef struct CFontzPacket_private_data {
 	int contrast;
 	int brightness;
 	int offbrightness;
+	int statebrightness;
+	struct timeval *waittimebrightness;
+	int secsofbrightness;
+	int alwaysbrightness;
 	unsigned int LEDstate;
 
 	char info[255];
@@ -143,6 +149,7 @@ CFontzPacket_init (Driver *drvthis)
 	p->cellheight = DEFAULT_CELL_HEIGHT;
 	p->ccmode = standard;
 	p->LEDstate = 0xFFFF;
+	p->statebrightness = 1;
 
 	debug(RPT_INFO, "%s(%p)", __FUNCTION__, drvthis);
 
@@ -220,7 +227,7 @@ CFontzPacket_init (Driver *drvthis)
 	}
 	p->offbrightness = tmp;
 
-	/* Get speed setting. */
+		/* Get speed setting. */
 	tmp = drvthis->config_get_int(drvthis->name, "Speed", 0, p->model_desc->speed);
 	debug(RPT_INFO, "%s: Speed (in config) is '%d'", __FUNCTION__, tmp);
 	if ((tmp != 19200) && (tmp != 115200)) {
@@ -291,6 +298,17 @@ CFontzPacket_init (Driver *drvthis)
 		return -1;
 	}
 	memset(p->backingstore, ' ', p->width * p->height);
+
+  /* Initialize delay */
+  if ((p->waittimebrightness = malloc(sizeof(struct timeval))) == NULL) {
+    report(RPT_ERR, "%s: error allocating memory", drvthis->name);
+    return -1;
+  }
+  timerclear(p->waittimebrightness);
+
+	p->secsofbrightness = 5;
+	p->alwaysbrightness = 0;
+
 
 	/* Set display-specific stuff.. */
 	if (cf_reboot) {
@@ -507,30 +525,53 @@ CFontzPacket_flush (Driver *drvthis)
 MODULE_EXPORT const char *
 CFontzPacket_get_key (Driver *drvthis)
 {
+
+  PrivateData *p = drvthis->private_data;
+
 	unsigned char key = GetKeyFromKeyRing(&keyring);
+
+  int i = 0;
+  int index = 0;
+  int key_pressed = 0;
+  struct timeval current_time, delay_time;
+
+
+  gettimeofday(&current_time, NULL);
+  if (!timerisset(p->waittimebrightness)) {
+    /* Set first timer for display */
+    delay_time.tv_sec = p->secsofbrightness;
+    delay_time.tv_usec = 0;
+    timeradd(&current_time, &delay_time, p->waittimebrightness);
+  }
 
 	switch (key) {
 		case CFP_KEY_UL_PRESS:
 		case CFP_KEY_UP:
-			return "Up";
+			index = 0;
+			key_pressed = 1;
 			break;
 		case CFP_KEY_LL_PRESS:
 		case CFP_KEY_DOWN:
-			return "Down";
+			index = 1;
+			key_pressed = 1;
 			break;
 		case CFP_KEY_LEFT:
-			return "Left";
+			index = 2;
+			key_pressed = 1;
 			break;
 		case CFP_KEY_RIGHT:
-			return "Right";
+			index = 3;
+			key_pressed = 1;
 			break;
 		case CFP_KEY_UR_PRESS:
 		case CFP_KEY_ENTER:
-			return "Enter";
+			index = 4;
+			key_pressed = 1;
 			break;
 		case CFP_KEY_LR_PRESS:
 		case CFP_KEY_ESCAPE:
-			return "Escape";
+			index = 5;
+			key_pressed = 1;
 			break;
 		case CFP_KEY_UP_RELEASE:
 		case CFP_KEY_DOWN_RELEASE:
@@ -542,17 +583,47 @@ CFontzPacket_get_key (Driver *drvthis)
 		case CFP_KEY_UR_RELEASE:
 		case CFP_KEY_LL_RELEASE:
 		case CFP_KEY_LR_RELEASE:
-			/* Key release events are ignored */
-			return NULL;
 			break;
 		default:
 			if (key != '\0')
 				report(RPT_INFO, "%s: Untreated key 0x%02X", drvthis->name, key);
-			return NULL;
 			break;
 	}
-	/* NOTREACHED */
-	return NULL;
+
+
+
+
+	  if (!key_pressed) {
+    do {
+      if (timercmp(&current_time, p->waittimebrightness, <))
+        break;
+
+			
+			int temp_brightness = CFontzPacket_get_brightness(drvthis, BACKLIGHT_ON);
+			
+			if (temp_brightness < 51)
+				break;
+
+			CFontzPacket_set_brightness(drvthis, BACKLIGHT_ON, temp_brightness - 5);
+			// p->statebrightness = 0;
+    } while (0);
+    return NULL;
+  }
+
+	// From here key is pressed
+
+  // Set new timer for brightness
+  delay_time.tv_sec = p->secsofbrightness;
+  delay_time.tv_usec = 0;
+  timeradd(&current_time, &delay_time, p->waittimebrightness);
+
+	int temp_brightness = CFontzPacket_get_brightness(drvthis, BACKLIGHT_ON);
+	if (temp_brightness < 200){
+		CFontzPacket_set_brightness(drvthis, BACKLIGHT_ON, 1000);
+		return NULL;
+	}
+		
+  return (KeyMap[index]);
 }
 
 
