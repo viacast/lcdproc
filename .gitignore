@@ -256,3 +256,4 @@ tags
 *.patch
 *.diff
 ar-lib
+*LCDd.conf
