@@ -217,6 +217,25 @@ CFontzPacket_init (Driver *drvthis)
 	}
 	p->brightness = tmp;
 
+	/* Always brightness? */
+	tmp = drvthis->config_get_int(drvthis->name, "AlwaysBrightness", 0, 0);
+	debug(RPT_INFO, "%s: Brightness always is '%d'", __FUNCTION__, tmp);
+	if ((tmp < 0) || (tmp > 1)) {
+		report(RPT_WARNING, "%s: Brightness must be 0 or 1; using default %d",
+			drvthis->name, 0);
+		tmp = 0;
+	}
+	p->alwaysbrightness = tmp;
+
+	/* Secs to fadeout ?*/
+  tmp = drvthis->config_get_int(drvthis->name, "SecondsFade", 0, 60);
+  if ((tmp > 120) || (tmp < 0)) {
+    report(RPT_WARNING,
+           "%s: Seconds to hide must be between 0 and 120; using default 60");
+    tmp = 60;
+  }
+  p->secsofbrightness = tmp;
+
 	/* Which backlight-off "brightness" */
 	tmp = drvthis->config_get_int(drvthis->name, "OffBrightness", 0, DEFAULT_OFFBRIGHTNESS);
 	debug(RPT_INFO, "%s: OffBrightness (in config) is '%d'", __FUNCTION__, tmp);
@@ -305,9 +324,6 @@ CFontzPacket_init (Driver *drvthis)
     return -1;
   }
   timerclear(p->waittimebrightness);
-
-	p->secsofbrightness = 5;
-	p->alwaysbrightness = 0;
 
 
 	/* Set display-specific stuff.. */
@@ -598,7 +614,9 @@ CFontzPacket_get_key (Driver *drvthis)
       if (timercmp(&current_time, p->waittimebrightness, <))
         break;
 
-			
+			if (p->alwaysbrightness)
+				break;
+				
 			int temp_brightness = CFontzPacket_get_brightness(drvthis, BACKLIGHT_ON);
 			
 			if (temp_brightness < 51)
