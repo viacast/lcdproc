@@ -126,6 +126,8 @@ void viacast_lcd_setup_gfxprim(Driver *drvthis);
 void check_inotify(Driver *drvthis);
 int reload_icons(Driver *drvthis);
 void destroy_icons(Driver *drvthis);
+void draw_icons_1(Driver *drvthis);
+void draw_icons_2(Driver *drvthis);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
@@ -251,16 +253,72 @@ void destroy_icons(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
 
-  int i = 0 ;
+  int i = 0;
 
-  for ( i=0; i < p->n_icons; i++){
+  for (i = 0; i < p->n_icons; i++) {
     if (p->icon[i])
       gp_pixmap_free(p->icon[i]);
   }
 
   if (p->icon)
     free(p->icon);
+}
 
+void draw_icons_1(Driver *drvthis)
+{
+
+  PrivateData *p = drvthis->private_data;
+  int text_height = gp_text_height(&p->text_style);
+
+  int i = 0;
+  gp_coord coordx = gp_pixmap_w(p->pixmap);
+  gp_coord coordy = (p->height * text_height) + 4 * DEFAULT_V_SPACE_ICON;
+  gp_pixmap *temp_icon;
+  for (i = 0; i < p->n_icons; i++) {
+
+    gp_coord tmp_x = coordx - gp_pixmap_w(p->icon[i]) - DEFAULT_H_SPACE_ICON;
+
+    if (!p->icon[i])
+      continue;
+
+    if (tmp_x < 0)
+      continue;
+
+    coordx = tmp_x;
+
+    temp_icon = gp_filter_rotate_180_alloc(p->icon[i], NULL);
+
+    gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
+                    gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
+  }
+  gp_pixmap_free(temp_icon);
+}
+
+void draw_icons_2(Driver *drvthis)
+{
+
+  PrivateData *p = drvthis->private_data;
+
+  int i = 0;
+  gp_coord coordx = DEFAULT_H_SPACE_ICON;
+  gp_coord coordy = DEFAULT_V_SPACE_ICON;
+  gp_filter_brightness_ex(p->pixmap, 0, 0, gp_pixmap_w(p->pixmap),
+                          DEFAULT_HEIGHT_ICON + (2 * DEFAULT_V_SPACE_ICON),
+                          p->pixmap, 0, 0, DEFAULT_ALPHA_BG, NULL);
+  for (i = 0; i < p->n_icons; i++) {
+
+    if (!p->icon[i])
+      continue;
+
+    if ((gp_pixmap_w(p->icon[i]) + coordx + DEFAULT_H_SPACE_ICON) >
+        gp_pixmap_w(p->pixmap))
+      continue;
+
+    gp_blit_clipped(p->icon[i], 0, 0, gp_pixmap_w(p->icon[i]),
+                    gp_pixmap_h(p->icon[i]), p->pixmap, coordx, coordy);
+
+    coordx += gp_pixmap_w(p->icon[i]) + DEFAULT_H_SPACE_ICON;
+  }
 }
 
 void revstr(char *str1)
@@ -307,10 +365,6 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->hide_text = 1;
   p->timer = 0;
   p->speed = DEFAULT_SPEED;
-
-  // p->cellwidth = DEFAULT_CELL_WIDTH;
-  // p->cellheight = DEFAULT_CELL_HEIGHT;
-  // p->ccmode = standard;
 
   debug(RPT_INFO, "viacast_lcd: init(%p)", drvthis);
 
@@ -500,8 +554,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     return -1;
   }
 
-  p->wd = inotify_add_watch(p->fd_inotify, "/tmp/status_bar/",
-                            IN_ALL_EVENTS);
+  p->wd = inotify_add_watch(p->fd_inotify, "/tmp/status_bar/", IN_ALL_EVENTS);
   if (p->wd == -1) {
     report(RPT_NOTICE, "Cant create watch descriptor");
     return -1;
@@ -628,6 +681,9 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
   int i = 0;
 
   if (p->rotate == 1) {
+
+    draw_icons_1(drvthis);
+
     x = gp_pixmap_w(p->pixmap);
     x -= (p->text_style.font->max_glyph_width / 2);
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
@@ -641,7 +697,9 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
     }
   }
   else if (p->rotate == 3) {
-    
+
+    draw_icons_1(drvthis);
+
     y = (p->height * text_height);
     for (i = 0; i < p->height; i++) {
       strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
@@ -656,30 +714,14 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 
     int status_bar = 1;
     if (status_bar) {
-      gp_coord coordx = DEFAULT_H_SPACE_ICON;
-      gp_coord coordy = DEFAULT_V_SPACE_ICON;
-      gp_filter_brightness_ex(p->pixmap, 0, 0, gp_pixmap_w(p->pixmap), DEFAULT_HEIGHT_ICON + (2*DEFAULT_V_SPACE_ICON),
-                              p->pixmap, 0, 0, -0.3, NULL);
-      for (i = 0; i < p->n_icons; i++) {
-
-        if (!p->icon[i])
-          continue;
-       
-        if ( (gp_pixmap_w(p->icon[i]) + coordx + DEFAULT_H_SPACE_ICON) > gp_pixmap_w(p->pixmap))
-          continue;
-
-        gp_blit_clipped(p->icon[i], 0, 0, gp_pixmap_w(p->icon[i]),
-                        gp_pixmap_h(p->icon[i]), p->pixmap, coordx, coordy);
-
-        coordx += gp_pixmap_w(p->icon[i]) + DEFAULT_H_SPACE_ICON;
-      }
+      draw_icons_2(drvthis);
     }
 
     if (p->display_text) {
       gp_filter_brightness_ex(
           p->pixmap, x, y - DEFAULT_MARGIN_ALPHA, gp_pixmap_w(p->pixmap),
           (p->height * text_height) + DEFAULT_MARGIN_ALPHA, p->pixmap, x,
-          y - DEFAULT_MARGIN_ALPHA, -0.6, NULL);
+          y - DEFAULT_MARGIN_ALPHA, DEFAULT_ALPHA_BG, NULL);
 
       for (i = 0; i < p->height; i++) {
         strncpy(string, p->framebuf_lcdproc + (i * p->width), p->width);
