@@ -95,6 +95,8 @@ typedef struct text_private_data {
   int fd_inotify;
   int wd;
   struct inotify_event *event;
+  int always_status_bar;
+  int status_bar;
 
   struct timeval *key_wait_time;     /**< Time until key auto repeat */
   struct timeval *display_wait_time; /**< Time until key auto repeat */
@@ -291,7 +293,8 @@ void draw_icons_1(Driver *drvthis)
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
   }
-  gp_pixmap_free(temp_icon);
+  if (temp_icon)
+    gp_pixmap_free(temp_icon);
 }
 
 void draw_icons_2(Driver *drvthis)
@@ -365,6 +368,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->hide_text = 1;
   p->timer = 0;
   p->speed = DEFAULT_SPEED;
+  p->status_bar = 1;
 
   debug(RPT_INFO, "viacast_lcd: init(%p)", drvthis);
 
@@ -436,10 +440,19 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   tmp = drvthis->config_get_int(drvthis->name, "SecondsHideText", 0, 60);
   if ((tmp > 120) || (tmp < 0)) {
     report(RPT_WARNING,
-           "%s: Seconds to hide must be between 0 and 120; using default 60");
+           "%s: Seconds to hide must be between 0 and 120; using default 60", drvthis->name);
     tmp = 60;
   }
   p->secs_hide_text = tmp;
+
+  /* Always status bar ?*/
+  tmp = drvthis->config_get_bool(drvthis->name, "AlwaysStatusBar", 0, 0);
+  if ((tmp > 1) || (tmp < 0)) {
+    report(RPT_WARNING,
+           "%s: using default value 0", drvthis->name);
+    tmp = 0;
+  }
+  p->always_status_bar = tmp;
 
   /* Which speed */
   tmp = drvthis->config_get_int(drvthis->name, "Speed", 0, DEFAULT_SPEED);
@@ -712,8 +725,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
   else if (!p->resize) {
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
 
-    int status_bar = 1;
-    if (status_bar) {
+    if (p->status_bar) {
       draw_icons_2(drvthis);
     }
 
@@ -858,6 +870,7 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
         break;
 
       p->display_text = 0;
+      p->status_bar = p->always_status_bar ? 1 :  0;
     } while (0);
     return NULL;
   }
@@ -875,6 +888,7 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 
   if (!p->display_text) {
     p->display_text = 1;
+    p->status_bar = 1;
     return NULL;
   }
 
