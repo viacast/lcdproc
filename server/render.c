@@ -148,7 +148,7 @@ render_screen(Screen *s, long timer)
 	}
 	else {
 		/* Simple: Only send lowest bit then... */
-		drivers_backlight(tmp_state & BACKLIGHT_ON);
+		drivers_backlight(backlight);
 	}
 
 	/* 3. Output ports from LCD - outputs depend on the current screen */
