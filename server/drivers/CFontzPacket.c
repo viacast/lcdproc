@@ -149,7 +149,7 @@ CFontzPacket_init (Driver *drvthis)
 	p->cellheight = DEFAULT_CELL_HEIGHT;
 	p->ccmode = standard;
 	p->LEDstate = 0xFFFF;
-	p->statebrightness = 1;
+
 
 	debug(RPT_INFO, "%s(%p)", __FUNCTION__, drvthis);
 
@@ -216,6 +216,7 @@ CFontzPacket_init (Driver *drvthis)
 		tmp = DEFAULT_BRIGHTNESS;
 	}
 	p->brightness = tmp;
+	p->statebrightness = p->brightness;
 
 	/* Always brightness? */
 	tmp = drvthis->config_get_int(drvthis->name, "AlwaysBrightness", 0, 0);
@@ -611,19 +612,17 @@ CFontzPacket_get_key (Driver *drvthis)
 
 	  if (!key_pressed) {
     do {
+
+			if (p->alwaysbrightness){
+				p->statebrightness = p->brightness;
+				break;
+			}
+
       if (timercmp(&current_time, p->waittimebrightness, <))
         break;
 
-			if (p->alwaysbrightness)
-				break;
-				
-			int temp_brightness = CFontzPacket_get_brightness(drvthis, BACKLIGHT_ON);
-			
-			if (temp_brightness < 51)
-				break;
-
-			CFontzPacket_set_brightness(drvthis, BACKLIGHT_ON, temp_brightness - 5);
-			// p->statebrightness = 0;
+			p->statebrightness = p->offbrightness;
+	
     } while (0);
     return NULL;
   }
@@ -635,11 +634,8 @@ CFontzPacket_get_key (Driver *drvthis)
   delay_time.tv_usec = 0;
   timeradd(&current_time, &delay_time, p->waittimebrightness);
 
-	int temp_brightness = CFontzPacket_get_brightness(drvthis, BACKLIGHT_ON);
-	if (temp_brightness < 200){
-		CFontzPacket_set_brightness(drvthis, BACKLIGHT_ON, 1000);
-		return NULL;
-	}
+	p->statebrightness = p->brightness;
+
 		
   return (KeyMap[index]);
 }
@@ -785,9 +781,10 @@ MODULE_EXPORT void
 CFontzPacket_backlight (Driver *drvthis, int on)
 {
 	PrivateData *p = drvthis->private_data;
-	int hardware_value = (on == BACKLIGHT_ON)
-			     ? p->brightness
-			     : p->offbrightness;
+	int hardware_value = (on == BACKLIGHT_ON)?
+					 p->brightness: (on == BACKLIGHT_OFF) ?
+					 p->offbrightness :
+					 p->statebrightness;
 
 	/* map range [0, 1000] -> [0, 100] that the hardware understands */
 	hardware_value /= 10;
