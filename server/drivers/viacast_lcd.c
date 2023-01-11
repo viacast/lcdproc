@@ -235,8 +235,7 @@ int reload_icons(Driver *drvthis)
   const char *directory_scan = "/tmp/status_bar/";
 
   int n = scandir(directory_scan, &p->icons_list, filter, alphasort);
-  if (n == -1) {
-    perror("scandir");
+  if (n <= 0) {
     return n;
   }
 
@@ -264,6 +263,8 @@ void destroy_icons(Driver *drvthis)
 
   if (p->icon)
     free(p->icon);
+  
+  p->icon = NULL;
 }
 
 void draw_icons_1(Driver *drvthis)
@@ -275,7 +276,7 @@ void draw_icons_1(Driver *drvthis)
   int i = 0;
   gp_coord coordx = gp_pixmap_w(p->pixmap);
   gp_coord coordy = (p->height * text_height) + 4 * DEFAULT_V_SPACE_ICON;
-  gp_pixmap *temp_icon;
+  gp_pixmap *temp_icon = NULL;
   for (i = 0; i < p->n_icons; i++) {
 
     gp_coord tmp_x = coordx - gp_pixmap_w(p->icon[i]) - DEFAULT_H_SPACE_ICON;
@@ -301,6 +302,9 @@ void draw_icons_2(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
+
+  if (!p->icon)
+    return;
 
   int i = 0;
   gp_coord coordx = DEFAULT_H_SPACE_ICON;
