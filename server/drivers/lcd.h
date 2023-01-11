@@ -179,6 +179,9 @@ typedef struct lcd_logical_driver {
 	int (*get_rotate) (struct lcd_logical_driver *drvthis);
 	void (*set_rotate)	(struct lcd_logical_driver *drvthis, int rotate);
 
+	int (*get_display_text) (struct lcd_logical_driver *drvthis);
+	void (*set_display_text)	(struct lcd_logical_driver *drvthis, int display_text);
+
 	const char *(*get_pretty_name) (struct lcd_logical_driver *drvthis);
 
 	/* informational functions */

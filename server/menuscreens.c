@@ -77,6 +77,7 @@ MenuEventFunc(titlespeed_handler);
 MenuEventFunc(contrast_handler);
 MenuEventFunc(brightness_handler);
 MenuEventFunc(rotate_handler);
+MenuEventFunc(display_text_handler);
 
 int
 menuscreens_init(void)
@@ -530,8 +531,8 @@ menuscreen_create_menu(void)
 	checkbox = menuitem_create_checkbox("heartbeat", heartbeat_handler, "Heartbeat", NULL, true, heartbeat);
 	menu_add_item(options_menu, checkbox);
 
-	checkbox = menuitem_create_checkbox("backlight", backlight_handler, "Backlight", NULL, true, backlight);
-	menu_add_item(options_menu, checkbox);
+	// checkbox = menuitem_create_checkbox("backlight", backlight_handler, "Backlight", NULL, true, backlight);
+	// menu_add_item(options_menu, checkbox);
 
 	slider = menuitem_create_slider("titlespeed", titlespeed_handler,
 					"TitleSpeed", NULL, "0", "10", TITLESPEED_NO, TITLESPEED_MAX, 1, titlespeed);
@@ -544,11 +545,14 @@ menuscreen_create_menu(void)
 	for (driver = drivers_getfirst(); driver; driver = drivers_getnext()) {
 		int contrast_avail = (driver->get_contrast && driver->set_contrast) ? 1 : 0;
 		int brightness_avail = (driver->get_brightness && driver->set_brightness) ? 1 : 0;
+		
+		int backlight_avail = (driver->backlight) ? 1 : 0;
 
 		int rotate_avail = (driver->get_rotate && driver->set_rotate) ? 1 : 0;
+		int display_text_avail = (driver->get_display_text && driver->set_display_text) ? 1 : 0;
 
 
-		if (contrast_avail || brightness_avail || rotate_avail) {
+		if (contrast_avail || brightness_avail || rotate_avail || display_text_avail || backlight_avail) {
 			/* menu's client is NULL since we're in the server */
 			int pretty_name_avail = (driver->get_pretty_name) ? 1 : 0;
 
@@ -565,6 +569,10 @@ menuscreen_create_menu(void)
 			}
 			menu_set_association(driver_menu, driver);
 			menu_add_item(options_menu, driver_menu);
+			if (backlight_avail){
+				checkbox = menuitem_create_checkbox("backlight", backlight_handler, "Backlight", NULL, true, backlight);
+				menu_add_item(driver_menu, checkbox);
+			}
 			if (contrast_avail) {
 				int contrast = driver->get_contrast(driver);
 
@@ -591,7 +599,12 @@ menuscreen_create_menu(void)
 				ring = menuitem_create_ring("rotate", rotate_handler, "Rotate", NULL, "0 deg\t90 deg\t180 deg\t270 deg", rotate);
 				menu_add_item(driver_menu, ring);
 			}
+			if (display_text_avail){
+				int display_text = driver->get_display_text(driver);
 
+				checkbox = menuitem_create_checkbox("display_text", display_text_handler, "Always show text", NULL, 0, display_text);
+				menu_add_item(driver_menu, checkbox);
+			}
 		}
 	}
 }
@@ -777,6 +790,29 @@ MenuEventFunc(rotate_handler)
 	}
 	return 0;
 }
+
+MenuEventFunc(display_text_handler)
+{
+	debug(RPT_DEBUG, "%s(item=[%s], event=%d)", __FUNCTION__,
+	      ((item != NULL) ? item->id : "(null)"), event);
+
+	/*
+	 * This function can be called by one of several drivers that support
+	 * display_text !
+	 */
+	if ((item != NULL) && ((event == MENUEVENT_UPDATE)))  {
+		/* Determine the driver by following the menu's association */
+		Driver *driver = item->parent->data.menu.association;
+
+		if (driver != NULL) {
+			driver->set_display_text(driver, item->data.checkbox.value);
+			report(RPT_INFO, "Menu: set display text of [%.40s] to %d",
+			       driver->name, item->data.checkbox.value);
+		}
+	}
+	return 0;
+}
+
 
 void
 menuscreen_add_screen(Screen *s)

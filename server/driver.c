@@ -71,6 +71,8 @@ DriverSymbols driver_symbols[] = {
 	{ "set_brightness",     offsetof(Driver, set_brightness),     0 },
 	{ "get_rotate",     		offsetof(Driver, get_rotate),   	    0 },
 	{ "set_rotate",     		offsetof(Driver, set_rotate),			    0 },
+	{ "get_display_text",   offsetof(Driver, get_display_text),   0 },
+	{ "set_display_text",   offsetof(Driver, set_display_text),   0 },
 	{ "get_pretty_name", 		offsetof(Driver, get_pretty_name),    0 },
 	{ "backlight",          offsetof(Driver, backlight),          0 },
 	{ "output",             offsetof(Driver, output),             0 },

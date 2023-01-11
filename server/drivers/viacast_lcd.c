@@ -96,6 +96,7 @@ typedef struct text_private_data {
   int wd;
   struct inotify_event *event;
   int always_status_bar;
+  int always_text_bar;
   int status_bar;
 
   struct timeval *key_wait_time;     /**< Time until key auto repeat */
@@ -457,6 +458,15 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     tmp = 0;
   }
   p->always_status_bar = tmp;
+
+    /* Always text bar ?*/
+  tmp = drvthis->config_get_bool(drvthis->name, "AlwaysTextBar", 0, 0);
+  if ((tmp > 1) || (tmp < 0)) {
+    report(RPT_WARNING,
+           "%s: using default value 0", drvthis->name);
+    tmp = 0;
+  }
+  p->always_text_bar = tmp;
 
   /* Which speed */
   tmp = drvthis->config_get_int(drvthis->name, "Speed", 0, DEFAULT_SPEED);
@@ -863,8 +873,15 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 
   if (!key_pressed) {
     do {
+            
+      if (p->always_text_bar){
+        p->display_text = 1;
+        break;
+      }
+
       if (!p->display_text)
         break;
+
 
       // lcd rotate is always displayed
       if (p->resize)
@@ -872,6 +889,7 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 
       if (timercmp(&current_time, p->display_wait_time, <))
         break;
+
 
       p->display_text = 0;
       p->status_bar = p->always_status_bar ? 1 :  0;
@@ -1040,6 +1058,36 @@ MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate)
   p->rotate = rotate;
   viacast_lcd_setup_gfxprim(drvthis);
 }
+
+/**
+ * Retrieve display text
+ * \param drvthis  Pointer to driver structure.
+ * \return Stored rotate in promille.
+ */
+MODULE_EXPORT int viacast_lcd_get_display_text(Driver *drvthis)
+{
+  PrivateData *p = drvthis->private_data;
+
+  return p->always_text_bar;
+}
+
+/**
+ * Set rotate
+ * \param drvthis  Pointer to driver structure.
+ * \param rotate Set new rotate
+ */
+MODULE_EXPORT void viacast_lcd_set_display_text(Driver *drvthis, int always_text)
+{
+  PrivateData *p = drvthis->private_data;
+
+  if ((always_text < 0) || (always_text > 1))
+    return;
+
+ p->always_text_bar = always_text;
+}
+
+
+
 
 MODULE_EXPORT const char *viacast_lcd_get_pretty_name(Driver *drvthis)
 {
