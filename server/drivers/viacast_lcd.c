@@ -90,11 +90,16 @@ typedef struct text_private_data {
   long timer;
 
   struct dirent **icons_list;
-  int reload_icons;
-  int n_icons;
-  int fd_inotify;
-  int wd;
-  struct inotify_event *event;
+  int reload_iconsl;
+  int reload_iconsr;
+  int n_icons_l;
+  int n_icons_r;
+  int fd_inotify_l;
+  int fd_inotify_r;
+  int wd_l;
+  int wd_r;
+  struct inotify_event *event_l;
+  struct inotify_event *event_r;
   int always_status_bar;
   int always_text_bar;
   int status_bar;
@@ -110,7 +115,8 @@ typedef struct text_private_data {
   int hide_text;
   int secs_hide_text;
   gp_pixmap *pixmap;
-  gp_pixmap **icon;
+  gp_pixmap **icon_l;
+  gp_pixmap **icon_r;
   gp_pixel black_pixel;
   gp_pixel white_pixel;
   gp_text_style text_style;
@@ -205,10 +211,11 @@ void check_inotify(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
+  ssize_t len;
 
   char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
 
-  ssize_t len = read(p->fd_inotify, buf, sizeof(buf));
+  len = read(p->fd_inotify_l, buf, sizeof(buf));
   if (len == -1 && errno != EAGAIN) {
     report(RPT_ERR, "Error on read fd inotify");
     exit(EXIT_FAILURE);
@@ -217,11 +224,28 @@ void check_inotify(Driver *drvthis)
   if (len > 0) {
 
     for (char *ptr = buf; ptr < buf + len;
-         ptr += sizeof(struct inotify_event) + p->event->len) {
+         ptr += sizeof(struct inotify_event) + p->event_l->len) {
 
-      p->event = (struct inotify_event *)ptr;
+      p->event_l = (struct inotify_event *)ptr;
 
-      check_inotify_event(p->event, &p->reload_icons);
+      check_inotify_event(p->event_l, &p->reload_iconsl);
+    }
+  }
+
+  len = read(p->fd_inotify_r, buf, sizeof(buf));
+  if (len == -1 && errno != EAGAIN) {
+    report(RPT_ERR, "Error on read fd inotify");
+    exit(EXIT_FAILURE);
+  }
+
+  if (len > 0) {
+
+    for (char *ptr = buf; ptr < buf + len;
+         ptr += sizeof(struct inotify_event) + p->event_r->len) {
+
+      p->event_r = (struct inotify_event *)ptr;
+
+      check_inotify_event(p->event_r, &p->reload_iconsr);
     }
   }
 }
@@ -233,22 +257,41 @@ int reload_icons(Driver *drvthis)
   destroy_icons(drvthis);
 
   char fullpath[1024];
-  const char *directory_scan = "/tmp/status_bar/";
+  int n = 0;
 
-  int n = scandir(directory_scan, &p->icons_list, filter, alphasort);
+  const char *directory_scanl = "/tmp/status_bar/left";
+  n = scandir(directory_scanl, &p->icons_list, filter, alphasort);
   if (n <= 0) {
+    p->n_icons_l = n;
     return n;
   }
 
-  p->icon = (gp_pixmap **)malloc(sizeof(gp_pixmap*) * n);
+  p->n_icons_l = n;
+  p->icon_l = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
 
   int i = 0;
   for (i = 0; i < n; i++) {
-    sprintf(fullpath, "%s%s", directory_scan, p->icons_list[i]->d_name);
-    p->icon[i] = gp_load_png(fullpath, NULL);
+    sprintf(fullpath, "%s/%s", directory_scanl, p->icons_list[i]->d_name);
+    p->icon_l[i] = gp_load_png(fullpath, NULL);
   }
 
-  return n;
+  
+  const char *directory_scanr = "/tmp/status_bar/right";
+  n = scandir(directory_scanr, &p->icons_list, filter, alphasort);
+  if (n <= 0) {
+    p->n_icons_r = n;
+    return n;
+  }
+  
+  p->n_icons_r = n;
+  p->icon_r = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
+
+  for (i = 0; i < n; i++) {
+    sprintf(fullpath, "%s/%s", directory_scanr, p->icons_list[i]->d_name);
+    p->icon_r[i] = gp_load_png(fullpath, NULL);
+  }
+
+  
 }
 
 void destroy_icons(Driver *drvthis)
@@ -257,15 +300,27 @@ void destroy_icons(Driver *drvthis)
 
   int i = 0;
 
-  for (i = 0; i < p->n_icons; i++) {
-    if (p->icon[i])
-      gp_pixmap_free(p->icon[i]);
+  for (i = 0; i < p->n_icons_l; i++) {
+    if (p->icon_l[i])
+      gp_pixmap_free(p->icon_l[i]);
   }
 
-  if (p->icon)
-    free(p->icon);
-  
-  p->icon = NULL;
+  if (p->icon_l)
+    free(p->icon_l);
+
+  p->icon_l = NULL;
+
+
+
+  for (i = 0; i < p->n_icons_r; i++) {
+    if (p->icon_r[i])
+      gp_pixmap_free(p->icon_r[i]);
+  }
+
+  if (p->icon_r)
+    free(p->icon_r);
+
+  p->icon_r = NULL;
 }
 
 void draw_icons_1(Driver *drvthis)
@@ -278,11 +333,12 @@ void draw_icons_1(Driver *drvthis)
   gp_coord coordx = gp_pixmap_w(p->pixmap);
   gp_coord coordy = (p->height * text_height) + 4 * DEFAULT_V_SPACE_ICON;
   gp_pixmap *temp_icon = NULL;
-  for (i = 0; i < p->n_icons; i++) {
+  
+  for (i = 0; i < p->n_icons_l; i++) {
 
-    gp_coord tmp_x = coordx - gp_pixmap_w(p->icon[i]) - DEFAULT_H_SPACE_ICON;
+    gp_coord tmp_x = coordx - gp_pixmap_w(p->icon_l[i]) - DEFAULT_H_SPACE_ICON;
 
-    if (!p->icon[i])
+    if (!p->icon_l[i])
       continue;
 
     if (tmp_x < 0)
@@ -290,11 +346,32 @@ void draw_icons_1(Driver *drvthis)
 
     coordx = tmp_x;
 
-    temp_icon = gp_filter_rotate_180_alloc(p->icon[i], NULL);
+    temp_icon = gp_filter_rotate_180_alloc(p->icon_l[i], NULL);
 
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
   }
+
+
+    for (i = 0; i < p->n_icons_r; i++) {
+
+    gp_coord tmp_x = coordx - gp_pixmap_w(p->icon_r[i]) - DEFAULT_H_SPACE_ICON;
+
+    if (!p->icon_r[i])
+      continue;
+
+    if (tmp_x < 0)
+      continue;
+
+    coordx = tmp_x;
+
+    temp_icon = gp_filter_rotate_180_alloc(p->icon_r[i], NULL);
+
+    gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
+                    gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
+  }
+
+
   if (temp_icon)
     gp_pixmap_free(temp_icon);
 }
@@ -304,7 +381,7 @@ void draw_icons_2(Driver *drvthis)
 
   PrivateData *p = drvthis->private_data;
 
-  if (!p->icon)
+  if ((!p->icon_l) && (!p->icon_r))
     return;
 
   int i = 0;
@@ -313,19 +390,35 @@ void draw_icons_2(Driver *drvthis)
   gp_filter_brightness_ex(p->pixmap, 0, 0, gp_pixmap_w(p->pixmap),
                           DEFAULT_HEIGHT_ICON + (2 * DEFAULT_V_SPACE_ICON),
                           p->pixmap, 0, 0, DEFAULT_ALPHA_BG, NULL);
-  for (i = 0; i < p->n_icons; i++) {
+  
+  for (i = 0; i < p->n_icons_l; i++) {
 
-    if (!p->icon[i])
+    if (!p->icon_l[i])
       continue;
 
-    if ((gp_pixmap_w(p->icon[i]) + coordx + DEFAULT_H_SPACE_ICON) >
+    if ((gp_pixmap_w(p->icon_l[i]) + coordx + DEFAULT_H_SPACE_ICON) >
         gp_pixmap_w(p->pixmap))
       continue;
 
-    gp_blit_clipped(p->icon[i], 0, 0, gp_pixmap_w(p->icon[i]),
-                    gp_pixmap_h(p->icon[i]), p->pixmap, coordx, coordy);
+    gp_blit_clipped(p->icon_l[i], 0, 0, gp_pixmap_w(p->icon_l[i]),
+                    gp_pixmap_h(p->icon_l[i]), p->pixmap, coordx, coordy);
 
-    coordx += gp_pixmap_w(p->icon[i]) + DEFAULT_H_SPACE_ICON;
+    coordx += gp_pixmap_w(p->icon_l[i]) + DEFAULT_H_SPACE_ICON;
+  }
+
+  for (i = 0; i < p->n_icons_r; i++) {
+
+    if (!p->icon_r[i])
+      continue;
+
+    if ((gp_pixmap_w(p->icon_r[i]) + coordx + DEFAULT_H_SPACE_ICON) >
+        gp_pixmap_w(p->pixmap))
+      continue;
+
+    gp_blit_clipped(p->icon_r[i], 0, 0, gp_pixmap_w(p->icon_r[i]),
+                    gp_pixmap_h(p->icon_r[i]), p->pixmap, coordx, coordy);
+
+    coordx += gp_pixmap_w(p->icon_r[i]) + DEFAULT_H_SPACE_ICON;
   }
 }
 
@@ -445,7 +538,8 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   tmp = drvthis->config_get_int(drvthis->name, "SecondsHideText", 0, 60);
   if ((tmp > 120) || (tmp < 0)) {
     report(RPT_WARNING,
-           "%s: Seconds to hide must be between 0 and 120; using default 60", drvthis->name);
+           "%s: Seconds to hide must be between 0 and 120; using default 60",
+           drvthis->name);
     tmp = 60;
   }
   p->secs_hide_text = tmp;
@@ -453,17 +547,15 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   /* Always status bar ?*/
   tmp = drvthis->config_get_bool(drvthis->name, "AlwaysStatusBar", 0, 0);
   if ((tmp > 1) || (tmp < 0)) {
-    report(RPT_WARNING,
-           "%s: using default value 0", drvthis->name);
+    report(RPT_WARNING, "%s: using default value 0", drvthis->name);
     tmp = 0;
   }
   p->always_status_bar = tmp;
 
-    /* Always text bar ?*/
+  /* Always text bar ?*/
   tmp = drvthis->config_get_bool(drvthis->name, "AlwaysTextBar", 0, 0);
   if ((tmp > 1) || (tmp < 0)) {
-    report(RPT_WARNING,
-           "%s: using default value 0", drvthis->name);
+    report(RPT_WARNING, "%s: using default value 0", drvthis->name);
     tmp = 0;
   }
   p->always_text_bar = tmp;
@@ -573,16 +665,33 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   }
 
   /*Config iontify*/
-  p->reload_icons = 1;
+  p->reload_iconsl = 1;
+  p->reload_iconsr = 1;
 
-  p->fd_inotify = inotify_init1(IN_NONBLOCK);
-  if (p->fd_inotify == -1) {
+  p->fd_inotify_l = inotify_init1(IN_NONBLOCK);
+  if (p->fd_inotify_l == -1) {
     report(RPT_NOTICE, "Cant create inotify");
     return -1;
   }
 
-  p->wd = inotify_add_watch(p->fd_inotify, "/tmp/status_bar/", IN_ALL_EVENTS);
-  if (p->wd == -1) {
+  p->fd_inotify_r = inotify_init1(IN_NONBLOCK);
+  if (p->fd_inotify_r == -1) {
+    report(RPT_NOTICE, "Cant create inotify");
+    return -1;
+  }
+
+  p->wd_l = inotify_add_watch(p->fd_inotify_l, "/tmp/status_bar/left/", IN_MODIFY | IN_ATTRIB   \
+			  | IN_MOVED_FROM	| IN_MOVED_TO | IN_CREATE | IN_DELETE		      \
+			  | IN_DELETE_SELF | IN_MOVE_SELF);
+  if (p->wd_l == -1) {
+    report(RPT_NOTICE, "Cant create watch descriptor");
+    return -1;
+  }
+
+  p->wd_r = inotify_add_watch(p->fd_inotify_r, "/tmp/status_bar/right/", IN_MODIFY | IN_ATTRIB   \
+			  | IN_MOVED_FROM	| IN_MOVED_TO | IN_CREATE | IN_DELETE		      \
+			  | IN_DELETE_SELF | IN_MOVE_SELF);
+  if (p->wd_r == -1) {
     report(RPT_NOTICE, "Cant create watch descriptor");
     return -1;
   }
@@ -677,10 +786,13 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
 
+
   check_inotify(drvthis);
-  if (p->reload_icons) {
-    p->n_icons = reload_icons(drvthis);
-    p->reload_icons = 0;
+
+  if ((p->reload_iconsl) || (p->reload_iconsr)) {
+    reload_icons(drvthis);
+    p->reload_iconsl = 0;
+    p->reload_iconsr = 0;
   }
 
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
@@ -739,6 +851,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
   else if (!p->resize) {
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
 
+    p->status_bar = 1;
     if (p->status_bar) {
       draw_icons_2(drvthis);
     }
@@ -873,15 +986,14 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 
   if (!key_pressed) {
     do {
-            
-      if (p->always_text_bar){
+
+      if (p->always_text_bar) {
         p->display_text = 1;
         break;
       }
 
       if (!p->display_text)
         break;
-
 
       // lcd rotate is always displayed
       if (p->resize)
@@ -890,9 +1002,8 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
       if (timercmp(&current_time, p->display_wait_time, <))
         break;
 
-
       p->display_text = 0;
-      p->status_bar = p->always_status_bar ? 1 :  0;
+      p->status_bar = p->always_status_bar ? 1 : 0;
     } while (0);
     return NULL;
   }
@@ -1076,18 +1187,16 @@ MODULE_EXPORT int viacast_lcd_get_display_text(Driver *drvthis)
  * \param drvthis  Pointer to driver structure.
  * \param rotate Set new rotate
  */
-MODULE_EXPORT void viacast_lcd_set_display_text(Driver *drvthis, int always_text)
+MODULE_EXPORT void viacast_lcd_set_display_text(Driver *drvthis,
+                                                int always_text)
 {
   PrivateData *p = drvthis->private_data;
 
   if ((always_text < 0) || (always_text > 1))
     return;
 
- p->always_text_bar = always_text;
+  p->always_text_bar = always_text;
 }
-
-
-
 
 MODULE_EXPORT const char *viacast_lcd_get_pretty_name(Driver *drvthis)
 {
