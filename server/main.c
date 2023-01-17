@@ -725,6 +725,7 @@ do_reload(void)
 
 	config_clear();
 	clear_settings();
+	menuscreens_shutdown();
 
 	/* Reread command line*/
 	CHAIN(e, process_command_line(stored_argc, stored_argv));
@@ -744,6 +745,7 @@ do_reload(void)
 
 	/* And restart the drivers */
 	CHAIN(e, init_drivers());
+	CHAIN(e, menuscreens_init());
 	CHAIN_END(e, "Critical error while reloading, abort.");
 }
 
