@@ -141,12 +141,27 @@ void sighandler(const int signal, void *ptr)
 {
   static PrivateData *p = NULL;
 
+ 
+
   if (p == NULL) {
     p = ptr;
     return;
   }
   if (signal == SIGRTMIN) {
     p->reload_icons = 1;
+    return;
+  }
+  if (signal == (SIGRTMIN + 1)) {
+    struct timeval current_time, delay_time;
+
+    gettimeofday(&current_time, NULL);
+
+    // Set new timer for hide text
+    delay_time.tv_sec = p->secs_hide_text;
+    delay_time.tv_usec = 0;
+    timeradd(&current_time, &delay_time, p->display_wait_time);
+    p->display_text = 1;
+    p->status_bar = 1;
     return;
   }
 }
@@ -462,7 +477,7 @@ void draw_icons_3(Driver *drvthis)
   int i = 0;
   gp_coord height_status_bar = DEFAULT_HEIGHT_ICON + (2 * DEFAULT_V_SPACE_ICON);
   gp_coord coordx = 0;
-  gp_coord coordy = gp_pixmap_h(p->pixmap) - height_status_bar ;
+  gp_coord coordy = gp_pixmap_h(p->pixmap) - height_status_bar;
   gp_pixmap *temp_icon = NULL;
 
   gp_coord x_status_bar_back = gp_pixmap_w(p->pixmap) + height_status_bar;
@@ -526,7 +541,7 @@ void draw_icons_3(Driver *drvthis)
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
   }
 
-    /* Left 2 */
+  /* Left 2 */
   coordx = gp_pixmap_w(p->pixmap);
   coordy -= height_status_bar;
   x_available = gp_pixmap_w(p->pixmap);
@@ -909,6 +924,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->reload_icons = 1;
 
   signal(SIGRTMIN, sighandler);
+  signal(SIGRTMIN+1, sighandler);
   sighandler(SIGRTMAX, drvthis->private_data);
 
   report(RPT_INFO, "%s: init() done", drvthis->name);
