@@ -93,6 +93,7 @@ typedef struct text_private_data {
   struct dirent **icons_list;
   int reload_icons;
   int n_icons_l;
+  int n_icons_l2;
   int n_icons_r;
   int always_status_bar;
   int always_text_bar;
@@ -110,6 +111,7 @@ typedef struct text_private_data {
   int secs_hide_text;
   gp_pixmap *pixmap;
   gp_pixmap **icon_l;
+  gp_pixmap **icon_l2;
   gp_pixmap **icon_r;
   gp_pixel black_pixel;
   gp_pixel white_pixel;
@@ -226,7 +228,9 @@ int reload_icons(Driver *drvthis)
   int n = 0;
   int i = 0;
 
-  const char *directory_scanl = "/tmp/status_bar/left";
+  /* Left 1 */
+
+  const char *directory_scanl = "/tmp/status_bar/left1";
   n = scandir(directory_scanl, &p->icons_list, filter, alphasort);
 
   do {
@@ -243,6 +247,27 @@ int reload_icons(Driver *drvthis)
       p->icon_l[i] = gp_load_png(fullpath, NULL);
     }
   } while (0);
+
+  /* Left 2 */
+  const char *directory_scanl2 = "/tmp/status_bar/left2";
+  n = scandir(directory_scanl2, &p->icons_list, filter, alphasort);
+
+  do {
+    if (n <= 0) {
+      p->n_icons_l2 = n;
+      break;
+    }
+
+    p->n_icons_l2 = n;
+    p->icon_l2 = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
+
+    for (i = 0; i < n; i++) {
+      sprintf(fullpath, "%s/%s", directory_scanl2, p->icons_list[i]->d_name);
+      p->icon_l2[i] = gp_load_png(fullpath, NULL);
+    }
+  } while (0);
+
+  /* Right */
 
   const char *directory_scanr = "/tmp/status_bar/right";
   n = scandir(directory_scanr, &p->icons_list, filter, alphasort);
@@ -280,6 +305,16 @@ void destroy_icons(Driver *drvthis)
     free(p->icon_l);
 
   p->icon_l = NULL;
+
+  for (i = 0; i < p->n_icons_l2; i++) {
+    if (p->icon_l2[i])
+      gp_pixmap_free(p->icon_l2[i]);
+  }
+
+  if (p->icon_l2)
+    free(p->icon_l2);
+
+  p->icon_l2 = NULL;
 
   for (i = 0; i < p->n_icons_r; i++) {
     if (p->icon_r[i])
@@ -893,7 +928,6 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
     reload_icons(drvthis);
     p->reload_icons = 0;
   }
-
 
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
 
