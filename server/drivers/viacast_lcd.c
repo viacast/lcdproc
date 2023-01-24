@@ -440,7 +440,7 @@ void draw_icons_1(Driver *drvthis)
     coordx -= x_width;
     x_available -= x_width;
 
-    temp_icon = gp_filter_rotate_180_alloc(p->icon_l[i], NULL);
+    temp_icon = gp_filter_rotate_180_alloc(p->icon_l2[i], NULL);
 
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
@@ -544,7 +544,7 @@ void draw_icons_2(Driver *drvthis)
 
   PrivateData *p = drvthis->private_data;
 
-  if ((!p->icon_l) && (!p->icon_r))
+  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2))
     return;
 
   int i = 0;
@@ -555,60 +555,87 @@ void draw_icons_2(Driver *drvthis)
   gp_coord y_status_bar = 0;
   gp_coord x_status_bar = 0;
 
-  gp_coord x_available = 0;
+  gp_coord x_available = gp_pixmap_w(p->pixmap);
   gp_coord x_width = 0;
 
+  int need_create_status_bar = 1;
   for (i = 0; i < p->n_icons_r; i++) {
 
     if (!p->icon_r[i])
       continue;
 
     x_width = gp_pixmap_w(p->icon_r[i]) + DEFAULT_H_SPACE_ICON;
+    if (x_width > x_available)
+      continue;
 
-    if (x_width > x_available) {
+    if (need_create_status_bar) {
       gp_filter_brightness_ex(p->pixmap, x_status_bar, y_status_bar,
                               gp_pixmap_w(p->pixmap), height_status_bar,
                               p->pixmap, x_status_bar, y_status_bar,
                               DEFAULT_ALPHA_BG, NULL);
-      x_available = gp_pixmap_w(p->pixmap);
-      y_status_bar += height_status_bar;
-      x_status_bar = 0;
-      coordx = gp_pixmap_w(p->pixmap) - x_width - DEFAULT_H_SPACE_ICON;
-      coordy = y_status_bar - DEFAULT_HEIGHT_ICON - DEFAULT_V_SPACE_ICON;
+
+      need_create_status_bar = 0;
     }
 
+    coordx -= x_width;
+    x_available -= x_width;
     gp_blit_clipped(p->icon_r[i], 0, 0, gp_pixmap_w(p->icon_r[i]),
                     gp_pixmap_h(p->icon_r[i]), p->pixmap, coordx, coordy);
-
-    x_available -= x_width;
-
-    coordx -= x_width;
   }
 
+  /* Left 1 */
   coordx = DEFAULT_H_SPACE_ICON;
-
   for (i = 0; i < p->n_icons_l; i++) {
 
     if (!p->icon_l[i])
       continue;
 
     x_width = gp_pixmap_w(p->icon_l[i]) + DEFAULT_H_SPACE_ICON;
+    if (x_width > x_available)
+      continue;
 
-    if (x_width > x_available) {
+    if (need_create_status_bar) {
       gp_filter_brightness_ex(p->pixmap, x_status_bar, y_status_bar,
                               gp_pixmap_w(p->pixmap), height_status_bar,
                               p->pixmap, x_status_bar, y_status_bar,
                               DEFAULT_ALPHA_BG, NULL);
-      x_available = gp_pixmap_w(p->pixmap);
-      y_status_bar += height_status_bar;
-      x_status_bar = 0;
-      coordx = DEFAULT_H_SPACE_ICON;
-      coordy = y_status_bar - DEFAULT_HEIGHT_ICON - DEFAULT_V_SPACE_ICON;
+
+      need_create_status_bar = 0;
     }
 
     gp_blit_clipped(p->icon_l[i], 0, 0, gp_pixmap_w(p->icon_l[i]),
                     gp_pixmap_h(p->icon_l[i]), p->pixmap, coordx, coordy);
+    x_available -= x_width;
+    coordx += x_width;
+  }
 
+  /* Left 2 */
+  coordx = DEFAULT_H_SPACE_ICON;
+  need_create_status_bar = 1;
+  y_status_bar += height_status_bar;
+  coordy += y_status_bar;
+  x_available = gp_pixmap_w(p->pixmap);
+
+  for (i = 0; i < p->n_icons_l2; i++) {
+
+    if (!p->icon_l2[i])
+      continue;
+
+    x_width = gp_pixmap_w(p->icon_l2[i]) + DEFAULT_H_SPACE_ICON;
+    if (x_width > x_available)
+      continue;
+
+    if (need_create_status_bar) {
+      gp_filter_brightness_ex(p->pixmap, x_status_bar, y_status_bar,
+                              gp_pixmap_w(p->pixmap), height_status_bar,
+                              p->pixmap, x_status_bar, y_status_bar,
+                              DEFAULT_ALPHA_BG, NULL);
+
+      need_create_status_bar = 0;
+    }
+
+    gp_blit_clipped(p->icon_l2[i], 0, 0, gp_pixmap_w(p->icon_l2[i]),
+                    gp_pixmap_h(p->icon_l2[i]), p->pixmap, coordx, coordy);
     x_available -= x_width;
     coordx += x_width;
   }
