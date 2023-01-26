@@ -1443,6 +1443,36 @@ MODULE_EXPORT void viacast_lcd_set_display_text(Driver *drvthis,
   p->always_text_bar = always_text;
 }
 
+/**
+ * Retrieve display text
+ * \param drvthis  Pointer to driver structure.
+ * \return Stored rotate in promille.
+ */
+MODULE_EXPORT int viacast_lcd_get_display_status_bar(Driver *drvthis)
+{
+  PrivateData *p = drvthis->private_data;
+
+  return p->always_status_bar;
+}
+
+/**
+ * Set rotate
+ * \param drvthis  Pointer to driver structure.
+ * \param rotate Set new rotate
+ */
+MODULE_EXPORT void viacast_lcd_set_display_status_bar(Driver *drvthis,
+                                                int always_status_bar)
+{
+  PrivateData *p = drvthis->private_data;
+
+  if ((always_status_bar < 0) || (always_status_bar > 1))
+    return;
+
+  p->always_status_bar = always_status_bar;
+}
+
+
+
 MODULE_EXPORT const char *viacast_lcd_get_pretty_name(Driver *drvthis)
 {
   return "Viacast";

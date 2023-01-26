@@ -78,6 +78,7 @@ MenuEventFunc(contrast_handler);
 MenuEventFunc(brightness_handler);
 MenuEventFunc(rotate_handler);
 MenuEventFunc(display_text_handler);
+MenuEventFunc(display_status_bar_handler);
 
 int
 menuscreens_init(void)
@@ -550,6 +551,7 @@ menuscreen_create_menu(void)
 
 		int rotate_avail = (driver->get_rotate && driver->set_rotate) ? 1 : 0;
 		int display_text_avail = (driver->get_display_text && driver->set_display_text) ? 1 : 0;
+		int display_status_bar_avail = (driver->get_display_status_bar && driver->set_display_status_bar) ? 1 : 0;
 
 
 		if (contrast_avail || brightness_avail || rotate_avail || display_text_avail || backlight_avail) {
@@ -602,7 +604,13 @@ menuscreen_create_menu(void)
 			if (display_text_avail){
 				int display_text = driver->get_display_text(driver);
 
-				checkbox = menuitem_create_checkbox("display_text", display_text_handler, "Always show text", NULL, 0, display_text);
+				checkbox = menuitem_create_checkbox("display_text", display_text_handler, "Always text", NULL, 0, display_text);
+				menu_add_item(driver_menu, checkbox);
+			}
+			if (display_status_bar_avail){
+				int display_status_bar = driver->get_display_status_bar(driver);
+
+				checkbox = menuitem_create_checkbox("display_status_bar", display_status_bar_handler, "Always status_bar", NULL, 0, display_status_bar);
 				menu_add_item(driver_menu, checkbox);
 			}
 		}
@@ -806,6 +814,28 @@ MenuEventFunc(display_text_handler)
 
 		if (driver != NULL) {
 			driver->set_display_text(driver, item->data.checkbox.value);
+			report(RPT_INFO, "Menu: set display text of [%.40s] to %d",
+			       driver->name, item->data.checkbox.value);
+		}
+	}
+	return 0;
+}
+
+MenuEventFunc(display_status_bar_handler)
+{
+	debug(RPT_DEBUG, "%s(item=[%s], event=%d)", __FUNCTION__,
+	      ((item != NULL) ? item->id : "(null)"), event);
+
+	/*
+	 * This function can be called by one of several drivers that support
+	 * display_text !
+	 */
+	if ((item != NULL) && ((event == MENUEVENT_UPDATE)))  {
+		/* Determine the driver by following the menu's association */
+		Driver *driver = item->parent->data.menu.association;
+
+		if (driver != NULL) {
+			driver->set_display_status_bar(driver, item->data.checkbox.value);
 			report(RPT_INFO, "Menu: set display text of [%.40s] to %d",
 			       driver->name, item->data.checkbox.value);
 		}
