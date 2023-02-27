@@ -44,6 +44,7 @@
 #include <errno.h>
 
 #include "lcd.h"
+#include "shared/ledcolors.h"
 #include "CFontzPacket.h"
 #include "CFontz633io.h"
 #include "shared/report.h"
@@ -59,6 +60,12 @@
 #define NUM_CCs		8 /* max. number of custom characters */
 
 static char *KeyMap[6] = {"Up", "Down", "Left", "Right", "Enter", "Escape"};
+
+
+#define BYTE_COLOR_OFF	0x00 			// 0 0000
+#define BYTE_COLOR_GREEN	0x01 		// 0 0001
+#define BYTE_COLOR_RED 0x10 			// 1 0000
+#define BYTE_COLOR_AMBER 0x11		// 1 0001
 
 /** private data for the \c CFontzPacket driver */
 typedef struct CFontzPacket_private_data {
@@ -341,7 +348,7 @@ CFontzPacket_init (Driver *drvthis)
 	CFontzPacket_hardware_clear(drvthis);
 
 	/* turn LEDs off on a CF635 */
-	CFontzPacket_output(drvthis, 0);
+	CFontzPacket_output(drvthis, ALL_COLOR_OFF, 1);
 
 	report(RPT_DEBUG, "%s: init() done", drvthis->name);
 
@@ -1296,7 +1303,7 @@ CFontzPacket_string (Driver *drvthis, int x, int y, const char string[])
  * \param state    Integer with bits representing LED states.
  */
 MODULE_EXPORT void
-CFontzPacket_output(Driver *drvthis, int state)
+CFontzPacket_output(Driver *drvthis, LedColors led_colors, int led_index)
 {
 	static const unsigned char CFontz635_LEDs[CF635_NUM_LEDs] = {
 		11, 9, 7, 5,	/* Green LEDs first, Top first */
@@ -1305,10 +1312,46 @@ CFontzPacket_output(Driver *drvthis, int state)
 	PrivateData *p = drvthis->private_data;
 	unsigned char out[2];
 	int lednum;
+	u_int8_t state;
+	int byte_color=0;
 
 	if (p->model != 635)
 		return;
 
+
+
+		led_index--;
+		state = p->LEDstate;
+		state &= ~(1UL << led_index);
+		state &= ~(1UL << (led_index + 4));
+
+	switch (led_colors)
+	{
+	case COLOR_OFF:
+		byte_color = BYTE_COLOR_OFF;
+		break;
+	
+	case COLOR_GREEN:
+		byte_color = BYTE_COLOR_GREEN;
+		break;
+
+	case COLOR_RED:
+		byte_color = BYTE_COLOR_RED;
+		break;
+
+	case COLOR_AMBER:
+		byte_color = BYTE_COLOR_AMBER;
+		break;
+
+	default:
+		break;
+	}
+		state |= byte_color << led_index;
+
+	
+	if (led_colors == ALL_COLOR_OFF)
+		state = 0x0000;
+	
 	for (lednum = 0; lednum < CF635_NUM_LEDs; lednum++) {
 		unsigned int mask = (1 << lednum);
 		int on_off = (state & mask);
