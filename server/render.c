@@ -40,6 +40,8 @@
 #include "shared/report.h"
 #include "shared/LL.h"
 #include "shared/defines.h"
+#include "shared/ledcolors.h"
+
 
 #include "drivers.h"
 #include "screen.h"
@@ -58,6 +60,9 @@ static int backlight_fallback = BACKLIGHT_ON; /* If no backlight setting has bee
 int titlespeed = 1;
 
 int output_state = 0;
+LedColors led_colors = COLOR_OFF;
+int led_index;
+
 char *server_msg_text;
 int server_msg_expire = 0;
 
@@ -152,7 +157,7 @@ render_screen(Screen *s, long timer)
 	}
 
 	/* 3. Output ports from LCD - outputs depend on the current screen */
-	drivers_output(output_state);
+	drivers_output(led_colors, led_index);
 
 	/* 4. Draw a frame... */
 	render_frame(s->widgetlist, 0, 0,

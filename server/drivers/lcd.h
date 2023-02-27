@@ -30,6 +30,7 @@
 #define LCD_H
 
 #include <stddef.h>
+#include "shared/ledcolors.h"
 
 /* Maximum supported sizes */
 #define LCD_MAX_WIDTH 256
@@ -174,7 +175,7 @@ typedef struct lcd_logical_driver {
 	int (*get_brightness)	(struct lcd_logical_driver *drvthis, int state);
 	void (*set_brightness)	(struct lcd_logical_driver *drvthis, int state, int promille);
 	void (*backlight)	(struct lcd_logical_driver *drvthis, int on);
-	void (*output)		(struct lcd_logical_driver *drvthis, int state);
+	void (*output)		(struct lcd_logical_driver *drvthis, LedColors led_colors, int led_index);
 
 	int (*get_rotate) (struct lcd_logical_driver *drvthis);
 	void (*set_rotate)	(struct lcd_logical_driver *drvthis, int rotate);

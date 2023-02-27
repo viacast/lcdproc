@@ -77,7 +77,7 @@ void
 drivers_backlight(int brightness);
 
 void
-drivers_output(int state);
+drivers_output(LedColors led_colors, int led_index);
 
 const char *
 drivers_get_key(void);

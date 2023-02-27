@@ -23,6 +23,7 @@
 #include "shared/LL.h"
 #include "shared/report.h"
 #include "shared/configfile.h"
+#include "shared/ledcolors.h"
 
 #include "driver.h"
 #include "drivers.h"
@@ -440,15 +441,15 @@ drivers_backlight(int state)
  * \param state    New ouptut status.
  */
 void
-drivers_output(int state)
+drivers_output(LedColors led_colors, int led_index)
 {
 	Driver *drv;
 
-	debug(RPT_DEBUG, "%s(state=%d)", __FUNCTION__, state);
+	// debug(RPT_DEBUG, "%s(state=%d)", __FUNCTION__, state);
 
 	ForAllDrivers(drv) {
 		if (drv->output)
-			drv->output(drv, state);
+			drv->output(drv, led_colors, led_index);
 	}
 }
 

@@ -9,6 +9,8 @@
  * Copyright (c) 1999, William Ferrell, Selene Scriven
  */
 
+#include "shared/ledcolors.h"
+
 #ifndef RENDER_H
 #define RENDER_H
 
@@ -36,7 +38,8 @@ extern int heartbeat;
 extern int backlight;
 extern int titlespeed;
 extern int output_state;
-
+extern LedColors led_colors;
+extern int led_index;
 /* Render the given screen. */
 int render_screen(Screen *s, long timer);
 
