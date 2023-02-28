@@ -74,6 +74,12 @@
 
 static char *defaultKeyMap[MaxKeyMap] = { "Up", "Down", "Left", "Right", "Enter", "Escape" };
 
+#define CW_12382_NUM_LEDs	8
+
+#define BYTE_COLOR_OFF	0b00 			// 0 0000
+#define BYTE_COLOR_RED 0b01 			//  0001
+#define BYTE_COLOR_GREEN 0b10 		//  0010
+#define BYTE_COLOR_AMBER 0b11		//  0011
 
 /** private data for the \c CwLnx driver */
 typedef struct CwLnx_private_data {
@@ -101,6 +107,9 @@ typedef struct CwLnx_private_data {
 
 	int saved_brightness;	/* brightness as displayed on the LCD currently */
 	int brightness;		/* brightness as it will be displayed at next flush */
+
+	unsigned int LEDstate;
+
 } PrivateData;
 
 
@@ -754,6 +763,7 @@ CwLnx_flush(Driver *drvthis)
     unsigned char *q = p->framebuf;
     unsigned char *r = p->backingstore;
 
+
     for (i = 0; i < p->height; i++) {
 	for (j = 0; j < p->width; j++) {
 	    if ((*q == *r) && !((0 < *q) && (*q < 16))) {
@@ -1347,3 +1357,77 @@ CwLnx_get_key(Driver *drvthis)
 }
 
 
+
+
+/**
+ * Set output port: output values using the LEDs of a CF635.
+ * \param drvthis  Pointer to driver structure.
+ * \param state    Integer with bits representing LED states.
+ */
+MODULE_EXPORT void
+CwLnx_output(Driver *drvthis, LedColors led_colors, int led_index)
+{
+	
+	PrivateData *p = drvthis->private_data;
+	unsigned char out[4];
+	int lednum;
+	u_int8_t state;
+	int byte_color=0;
+
+	if (p->model != 12832)
+		return;
+
+
+
+	state = p->LEDstate;
+	state &= ~(1UL << (led_index -1) * 2);
+	state &= ~(1UL << (led_index -1) * 2 + 1);
+
+	switch (led_colors)
+	{
+	case COLOR_OFF:
+		byte_color = BYTE_COLOR_OFF;
+		break;
+	
+	case COLOR_GREEN:
+		byte_color = BYTE_COLOR_GREEN;
+		break;
+
+	case COLOR_RED:
+		byte_color = BYTE_COLOR_RED;
+		break;
+
+	case COLOR_AMBER:
+		byte_color = BYTE_COLOR_AMBER;
+		break;
+
+	default:
+		break;
+	}
+		state |= byte_color << (led_index -1) * 2;
+
+	
+	if (led_colors == ALL_COLOR_OFF)
+		state = 0x0000;
+
+		report(RPT_CRIT, "State: %d", state);
+		report(RPT_CRIT, "LEDState: %d", p->LEDstate);
+
+	
+	for (lednum = 1; lednum <= CW_12382_NUM_LEDs; lednum++) {
+		unsigned int mask = (1 << (lednum - 1));
+		int on_off = (state & mask);
+
+		if ((p->LEDstate & mask) != on_off) {
+
+			report(RPT_CRIT, "State: %d", state);
+
+			out[0] = 0xfe;
+			out[1] = (on_off == 0) ? 0x64 : 0x63;
+			out[2] = lednum;
+			out[3] = 0xfd;
+			Write_LCD(p->fd, out, 4);
+		}
+	}
+	p->LEDstate = state;
+}

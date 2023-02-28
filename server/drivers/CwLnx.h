@@ -70,6 +70,7 @@ MODULE_EXPORT void CwLnx_set_char(Driver *drvthis, int n, unsigned char *dat);
 MODULE_EXPORT int  CwLnx_get_contrast(Driver *drvthis);
 MODULE_EXPORT void CwLnx_set_contrast(Driver *drvthis, int contrast);
 MODULE_EXPORT void CwLnx_backlight(Driver *drvthis, int on);
+MODULE_EXPORT void CwLnx_output(Driver *drvthis, LedColors led_colors, int led_index);
 
 #endif
 
