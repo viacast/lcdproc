@@ -60,6 +60,7 @@ static int backlight_fallback = BACKLIGHT_ON; /* If no backlight setting has bee
 int titlespeed = 1;
 
 int output_state = 0;
+int output_changed = 0;
 LedColors led_colors = COLOR_OFF;
 int led_index;
 
@@ -157,7 +158,10 @@ render_screen(Screen *s, long timer)
 	}
 
 	/* 3. Output ports from LCD - outputs depend on the current screen */
-	drivers_output(led_colors, led_index);
+	if (output_changed){
+		drivers_output(led_colors, led_index);
+		output_changed = 0;
+	}
 
 	/* 4. Draw a frame... */
 	render_frame(s->widgetlist, 0, 0,

@@ -38,6 +38,7 @@ extern int heartbeat;
 extern int backlight;
 extern int titlespeed;
 extern int output_state;
+extern int output_changed;
 extern LedColors led_colors;
 extern int led_index;
 /* Render the given screen. */

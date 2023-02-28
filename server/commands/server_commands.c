@@ -59,6 +59,7 @@ output_func(Client *c, int argc, char **argv)
 		return 0;
 	}
 
+	output_changed = 1;
 	if (argc == 3)
 	{
 
@@ -88,7 +89,6 @@ output_func(Client *c, int argc, char **argv)
 
 		// sock_printf_error(c->sock, "succes was %d setted to %d.\n",out,output_state);
 		report(RPT_NOTICE, "output states changed");
-		
 		return 0;
 	}
 
