@@ -1409,10 +1409,6 @@ CwLnx_output(Driver *drvthis, LedColors led_colors, int led_index)
 	
 	if (led_colors == ALL_COLOR_OFF)
 		state = 0x0000;
-
-		report(RPT_CRIT, "State: %d", state);
-		report(RPT_CRIT, "LEDState: %d", p->LEDstate);
-
 	
 	for (lednum = 1; lednum <= CW_12382_NUM_LEDs; lednum++) {
 		unsigned int mask = (1 << (lednum - 1));
@@ -1420,9 +1416,7 @@ CwLnx_output(Driver *drvthis, LedColors led_colors, int led_index)
 
 		if ((p->LEDstate & mask) != on_off) {
 
-			report(RPT_CRIT, "State: %d", state);
-
-			out[0] = 0xfe;
+				out[0] = 0xfe;
 			out[1] = (on_off == 0) ? 0x64 : 0x63;
 			out[2] = lednum;
 			out[3] = 0xfd;
