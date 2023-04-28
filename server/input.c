@@ -135,12 +135,12 @@ input_internal_key(const char *key)
 		}
 		else if (strcmp(key, prev_screen_key) == 0) {
 			screenlist_goto_prev();
-			// server_msg("Prev", 4);
+			server_msg("Prev", 4);
 			screen_offset = 0;
 		}
 		else if (strcmp(key, next_screen_key) == 0) {
 			screenlist_goto_next();
-			// server_msg("Next", 4);
+			server_msg("Next", 4);
 			screen_offset = 0;
 		}
 		else if (strcmp(key, scroll_up_key) == 0) {
