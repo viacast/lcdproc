@@ -77,8 +77,8 @@ static char *defaultKeyMap[MaxKeyMap] = { "Up", "Down", "Left", "Right", "Enter"
 #define CW_12382_NUM_LEDs	8
 
 #define BYTE_COLOR_OFF	0b00 			// 0 0000
-#define BYTE_COLOR_RED 0b01 			//  0001
-#define BYTE_COLOR_GREEN 0b10 		//  0010
+#define BYTE_COLOR_GREEN 0b01 			//  0001
+#define BYTE_COLOR_RED 0b10 		//  0010
 #define BYTE_COLOR_AMBER 0b11		//  0011
 
 /** private data for the \c CwLnx driver */
