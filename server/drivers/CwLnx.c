@@ -75,6 +75,7 @@
 static char *defaultKeyMap[MaxKeyMap] = { "Up", "Down", "Left", "Right", "Enter", "Escape" };
 
 #define CW_12382_NUM_LEDs	8
+#define CW_LINUX_NUM_LEDs	4
 
 #define BYTE_COLOR_OFF	0b00 			// 0 0000
 #define BYTE_COLOR_GREEN 0b01 			//  0001
@@ -649,6 +650,11 @@ CwLnx_init(Driver *drvthis)
     usleep(SETUP_DELAY);
 
     report(RPT_DEBUG, "%s: init() done", drvthis->name);
+
+		int i = 0;
+		for (i=0; i < CW_LINUX_NUM_LEDs; i++){
+			CwLnx_output(drvthis, COLOR_RED, i+1);
+		}
 
     return 0;
 }
