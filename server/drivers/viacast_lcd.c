@@ -1247,8 +1247,8 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
     case 'B':
       battery_read= key[i][1];
       report(RPT_INFO, "Read battery value :%u", battery_read);
-      appendValueBattery(p->battery, battery_read);
-      if ( tryUpdateBatteryValue(p->battery)) {
+      appendValueBattery(&p->battery, battery_read);
+      if ( tryUpdateBatteryValue(&p->battery)) {
         report(RPT_INFO, "Update battery to  :%u", p->battery.battery_current);
         p->reload_icons = 1;  
       }
