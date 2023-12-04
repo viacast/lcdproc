@@ -743,7 +743,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->timer = 0;
   p->speed = DEFAULT_SPEED;
   p->status_bar = 1;
-  p->battery = {0};
+  p->battery= {0};
   debug(RPT_INFO, "viacast_lcd: init(%p)", drvthis);
 
   /* Read config file */
