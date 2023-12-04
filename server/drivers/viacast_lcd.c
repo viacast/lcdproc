@@ -303,11 +303,12 @@ int reload_icons(Driver *drvthis)
     uint8_t interval = ((MAX_BATTERY - MIN_BATTERY)/N_BATTERY_STATE);
     char battery_state[32];
 
-    p->battery.battery_current <= MIN_BATTERY ? battery_state = "battery_00.png":
-    p->battery.battery_current <= (MIN_BATTERY + interval) ?  battery_state = "battery_25.png":
-    p->battery.battery_current <= (MIN_BATTERY + 2*interval) ?  battery_state = "battery_50.png":
-    p->battery.battery_current <= (MIN_BATTERY + 3*interval) ?  battery_state = "battery_75.png":
-    p->battery.battery_current <= (MIN_BATTERY + 4*interval) ?  battery_state = "battery_100.png":
+     sprintf(battery_state,"%s",
+        (p->battery.battery_current <= MIN_BATTERY) ? "battery_00.png" :
+        (p->battery.battery_current <= (MIN_BATTERY + interval)) ? "battery_25.png" :
+        (p->battery.battery_current <= (MIN_BATTERY + 2 * interval)) ? "battery_50.png" :
+        (p->battery.battery_current <= (MIN_BATTERY + 3 * interval)) ? "battery_75.png" :
+        "battery_100.png");
 
 
     sprintf(fullpath, "/viacast/lcd/icons/%s", battery_state);
@@ -743,7 +744,9 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->timer = 0;
   p->speed = DEFAULT_SPEED;
   p->status_bar = 1;
-  p->battery= {0};
+  memset(p->battery.battery_values, 0, sizeof(p->battery.battery_values));
+  p->battery.battery_current = 0;
+  p->battery.head = 0;
   debug(RPT_INFO, "viacast_lcd: init(%p)", drvthis);
 
   /* Read config file */
