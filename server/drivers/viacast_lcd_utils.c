@@ -1,6 +1,5 @@
 #include "viacast_lcd_utils.h"
 #include <stdint.h>
-#include <stdio.h>
 
 void appendValueBattery(Battery* battery, uint8_t value) {
     if (value > MAX_BATTERY){
@@ -10,9 +9,6 @@ void appendValueBattery(Battery* battery, uint8_t value) {
     if (value < MIN_BATTERY){
       value = MIN_BATTERY;
     }
-
-    fprintf(stderr, "Head: %u\n", battery->head);
-    fprintf(stderr, "Value: %u\n", value);
     
     battery->battery_values[battery->head] = value;
     battery->head = (battery->head + 1) % SIZE;
@@ -23,9 +19,6 @@ uint8_t getMeanBattery(Battery* battery) {
     int sum = 0;
     uint8_t result = 0;
     for (int i = 0; i < SIZE; ++i) {
-    fprintf(stderr, "INDEX: %d value: %d\n", i,battery->battery_values[i]);
-
-        
         if ( battery->battery_values[i] <= 0 ){
           continue;
         }
@@ -34,7 +27,6 @@ uint8_t getMeanBattery(Battery* battery) {
         count++;
     }
     result = count > 0 ? (uint8_t)(sum / count) : 0;
-    fprintf(stderr, "Count: %d Sum: %d Result: %u\n", count,sum, result);
     return result;
 }
 
@@ -42,9 +34,6 @@ int tryUpdateBatteryValue(Battery* battery){
   uint8_t mean_battery = getMeanBattery(battery);
   int32_t delta = battery->battery_current - mean_battery;
 
-  fprintf(stderr, "Mean_battery: %u\n", mean_battery);
-  fprintf(stderr, "Current: %u\n", battery->battery_current);
-  fprintf(stderr, "Delta: %d\n", delta);
   if ( delta > MAX_DELTA || delta < -MAX_DELTA) {
     battery->battery_current = mean_battery;
     return 1;
