@@ -21,6 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
  */
 
+#include <stdint.h>
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -1168,6 +1169,7 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
   int i = 0;
   int index = 0;
   int key_pressed = 0;
+  uint8_t value = 0;
   struct timeval current_time, delay_time;
 
   gettimeofday(&current_time, NULL);
@@ -1219,6 +1221,14 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
     case 'C':
       index = 5;
       key_pressed |= 1 << i;
+      break;
+    case 'B':
+      value = key[i][1];
+      report(RPT_INFO, "Read battery value s :%s", key[i]);
+      report(RPT_INFO, "Read battery value i :%i", key[i][1]);
+      report(RPT_INFO, "Read battery value x :%x", key[i][1]);
+      report(RPT_INFO, "Read battery value d :%d", key[i][1]);
+      report(RPT_INFO, "Read battery value u :%u", value);
       break;
     default:
       break;
