@@ -88,6 +88,7 @@ typedef struct text_private_data {
   int autorotate;
   int rotate;
   int keypad_rotate;
+  Battery battery;
 
   long timer;
 
@@ -287,6 +288,7 @@ int reload_icons(Driver *drvthis)
 
   const char *directory_scanr = "/tmp/status_bar/right";
   n = scandir(directory_scanr, &p->icons_list, filter, alphasort);
+  n ++; //battery icon 
 
   do {
     if (n <= 0) {
@@ -297,7 +299,24 @@ int reload_icons(Driver *drvthis)
     p->n_icons_r = n;
     p->icon_r = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
 
-    for (i = 0; i < n; i++) {
+    /* battery start */
+    uint8_t interval = ((MAX_BATTERY - MIN_BATTERY)/N_BATTERY_STATE);
+    char battery_state[32];
+
+    p->battery.battery_current <= MIN_BATTERY ? battery_state = "battery_00.png":
+    p->battery.battery_current <= (MIN_BATTERY + interval) ?  battery_state = "battery_25.png":
+    p->battery.battery_current <= (MIN_BATTERY + 2*interval) ?  battery_state = "battery_50.png":
+    p->battery.battery_current <= (MIN_BATTERY + 3*interval) ?  battery_state = "battery_75.png":
+    p->battery.battery_current <= (MIN_BATTERY + 4*interval) ?  battery_state = "battery_100.png":
+
+
+    sprintf(fullpath, "/viacast/lcd/icons/%s", battery_state);
+    if (p->battery.battery_current)
+    p->icon_r[0] = gp_load_png(fullpath, NULL); 
+
+    /* battery end */
+
+    for (i = 1; i < n; i++) {
       sprintf(fullpath, "%s/%s", directory_scanr, p->icons_list[i]->d_name);
       p->icon_r[i] = gp_load_png(fullpath, NULL);
     }
@@ -724,7 +743,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->timer = 0;
   p->speed = DEFAULT_SPEED;
   p->status_bar = 1;
-
+  p->battery = {0};
   debug(RPT_INFO, "viacast_lcd: init(%p)", drvthis);
 
   /* Read config file */
@@ -1169,7 +1188,7 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
   int i = 0;
   int index = 0;
   int key_pressed = 0;
-  uint8_t value = 0;
+  uint8_t battery_read = 0;
   struct timeval current_time, delay_time;
 
   gettimeofday(&current_time, NULL);
@@ -1223,12 +1242,14 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
       key_pressed |= 1 << i;
       break;
     case 'B':
-      value = key[i][1];
-      report(RPT_INFO, "Read battery value s :%s", key[i]);
-      report(RPT_INFO, "Read battery value i :%i", key[i][1]);
-      report(RPT_INFO, "Read battery value x :%x", key[i][1]);
-      report(RPT_INFO, "Read battery value d :%d", key[i][1]);
-      report(RPT_INFO, "Read battery value u :%u", value);
+      battery_read= key[i][1];
+      report(RPT_INFO, "Read battery value :%u", battery_read);
+      appendValueBattery(p->battery, battery_read);
+      if ( tryUpdateBatteryValue(p->battery)) {
+        report(RPT_INFO, "Update battery to  :%u", p->battery.battery_current);
+        p->reload_icons = 1;  
+      }
+
       break;
     default:
       break;
