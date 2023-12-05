@@ -112,6 +112,7 @@ typedef struct text_private_data {
   int hide_text;
   int secs_hide_text;
   gp_pixmap *pixmap;
+  gp_pixmap *icon_battery;
   gp_pixmap **icon_l;
   gp_pixmap **icon_l2;
   gp_pixmap **icon_r;
@@ -295,28 +296,36 @@ int reload_icons(Driver *drvthis)
   p->n_icons_r = n;
   p->icon_r = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
 
+  do {
+    if (n <= 0) {
+      p->n_icons_r = n;
+      break;
+    }
+
+    p->n_icons_r = n;
+    p->icon_r = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
+
+    for (i = 0; i < n; i++) {
+      sprintf(fullpath, "%s/%s", directory_scanr, p->icons_list[i]->d_name);
+      p->icon_r[i] = gp_load_png(fullpath, NULL);
+    }
+  } while (0);
+
   /* battery start */
   uint8_t interval = ((MAX_BATTERY - MIN_BATTERY)/N_BATTERY_STATE);
   char battery_state[32];
-
   sprintf(battery_state,"%s",
-  (p->battery.battery_current <= MIN_BATTERY) ? "battery_00.png" :
-  (p->battery.battery_current <= (MIN_BATTERY + interval)) ? "battery_25.png" :
-  (p->battery.battery_current <= (MIN_BATTERY + 2 * interval)) ? "battery_50.png" :
-  (p->battery.battery_current <= (MIN_BATTERY + 3 * interval)) ? "battery_75.png" :
-  "battery_100.png");
-
-
-  sprintf(fullpath, "/viacast/lcd/icons/%s", battery_state);
+    (p->battery.battery_current <= MIN_BATTERY) ? "battery_00.png" :
+    (p->battery.battery_current <= (MIN_BATTERY + interval)) ? "battery_25.png" :
+    (p->battery.battery_current <= (MIN_BATTERY + 2 * interval)) ? "battery_50.png" :
+    (p->battery.battery_current <= (MIN_BATTERY + 3 * interval)) ? "battery_75.png" :
+    "battery_100.png"); 
+        
+   sprintf(fullpath, "/viacast/lcd/icons/%s", battery_state);
   if (p->battery.battery_current > 0){
-    p->icon_r[0] = gp_load_png(fullpath, NULL); 
+    p->icon_battery = gp_load_png(fullpath, NULL); 
   }
   /* battery end */
-
-  for (i = 1; i < n; i++) {
-    sprintf(fullpath, "%s/%s", directory_scanr, p->icons_list[i]->d_name);
-    p->icon_r[i] = gp_load_png(fullpath, NULL);
-  } 
 }
 
 void destroy_icons(Driver *drvthis)
@@ -364,7 +373,7 @@ void draw_icons_1(Driver *drvthis)
   PrivateData *p = drvthis->private_data;
   int text_height = gp_text_height(&p->text_style);
 
-  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2))
+  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) && (!p->icon_battery))
     return;
 
   int i = 0;
@@ -385,6 +394,35 @@ void draw_icons_1(Driver *drvthis)
   gp_coord x_width = 0;
 
   int need_create_status_bar = 1;
+  
+  /* Battery */
+  do {
+
+    if (!p->icon_battery){
+        break;
+    }
+    
+    if (need_create_status_bar) {
+      gp_filter_brightness_ex(p->pixmap, x_status_bar_back, y_status_bar_back,
+                              height_status_bar, gp_pixmap_w(p->pixmap),
+                              p->pixmap, x_status_bar_back, y_status_bar_back,
+                              DEFAULT_ALPHA_BG, NULL);
+      need_create_status_bar = 0;
+    }
+
+    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
+
+    if (x_width > x_available)
+      break;
+
+    temp_icon = gp_filter_rotate_180_alloc(p->icon_battery, NULL);
+    gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
+                      gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
+
+    coordx += x_width;
+    x_available -= x_width;
+
+  } while (0);
 
   /* Right */
   for (i = 0; i < p->n_icons_r; i++) {
@@ -487,7 +525,7 @@ void draw_icons_3(Driver *drvthis)
   PrivateData *p = drvthis->private_data;
   int text_height = gp_text_height(&p->text_style);
 
-  if ((!p->icon_l) && (!p->icon_r))
+  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_battery))
     return;
 
   int i = 0;
@@ -503,6 +541,31 @@ void draw_icons_3(Driver *drvthis)
   gp_coord x_width = 0;
 
   int need_create_status_bar = 1;
+
+  /* Battery */
+  do {
+    if (!p->icon_battery)
+      break;
+
+    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
+    if (x_width > x_available)
+      continue;
+
+    if (need_create_status_bar) {
+      gp_filter_brightness_ex(p->pixmap, x_status_bar_back, y_status_bar_back,
+                              height_status_bar, gp_pixmap_w(p->pixmap),
+                              p->pixmap, x_status_bar_back, y_status_bar_back,
+                              DEFAULT_ALPHA_BG, NULL);
+      need_create_status_bar = 0;
+    }
+
+    temp_icon = gp_filter_rotate_180_alloc(p->icon_battery, NULL);
+    gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
+                    gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
+
+    coordx += x_width;
+    x_available -= x_width;
+  } while (0);
 
   /* Right */
   for (i = 0; i < p->n_icons_r; i++) {
@@ -597,7 +660,7 @@ void draw_icons_2(Driver *drvthis)
 
   PrivateData *p = drvthis->private_data;
 
-  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2))
+  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) && (!p->icon_battery))
     return;
 
   int i = 0;
@@ -612,6 +675,32 @@ void draw_icons_2(Driver *drvthis)
   gp_coord x_width = 0;
 
   int need_create_status_bar = 1;
+
+  /* Battery */
+  do {
+    if (!p->icon_battery)
+      break;;
+
+    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
+    if (x_width > x_available)
+      continue;
+
+    if (need_create_status_bar) {
+      gp_filter_brightness_ex(p->pixmap, x_status_bar, y_status_bar,
+                              gp_pixmap_w(p->pixmap), height_status_bar,
+                              p->pixmap, x_status_bar, y_status_bar,
+                              DEFAULT_ALPHA_BG, NULL);
+
+      need_create_status_bar = 0;
+    }
+
+    coordx -= x_width;
+    x_available -= x_width;
+    gp_blit_clipped(p->icon_battery, 0, 0, gp_pixmap_w(p->icon_battery),
+                    gp_pixmap_h(p->icon_battery), p->pixmap, coordx, coordy);
+  } while (0);
+
+  /* Right */
   for (i = 0; i < p->n_icons_r; i++) {
 
     if (!p->icon_r[i])
@@ -890,7 +979,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 
   p->black_pixel = gp_rgb_to_pixmap_pixel(0x00, 0x00, 0x00, p->pixmap);
   p->white_pixel = gp_rgb_to_pixmap_pixel(0xff, 0xff, 0xff, p->pixmap);
-
+  p->icon_battery = gp_pixmap_alloc(DEFAULT_HEIGHT_ICON, DEFAULT_HEIGHT_ICON, GP_PIXEL_RGB565);
   viacast_lcd_setup_gfxprim(drvthis);
 
   report(RPT_INFO, "Infos about fbdev\nwidth:%d\nheight:%d\nbits_per_pixel:%d",
