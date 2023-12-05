@@ -288,42 +288,35 @@ int reload_icons(Driver *drvthis)
 
   const char *directory_scanr = "/tmp/status_bar/right";
   n = scandir(directory_scanr, &p->icons_list, filter, alphasort);
-  n ++; //battery icon 
+  
+  n = n < 0 ? 1 : n++ // battery icon
 
-  do {
-    if (n <= 0) {
-      p->n_icons_r = n;
-      break;
-    }
+  
+  p->n_icons_r = n;
+  p->icon_r = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
 
-    p->n_icons_r = n;
-    p->icon_r = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
+  /* battery start */
+  uint8_t interval = ((MAX_BATTERY - MIN_BATTERY)/N_BATTERY_STATE);
+  char battery_state[32];
 
-    /* battery start */
-    uint8_t interval = ((MAX_BATTERY - MIN_BATTERY)/N_BATTERY_STATE);
-    char battery_state[32];
-
-     sprintf(battery_state,"%s",
-        (p->battery.battery_current <= MIN_BATTERY) ? "battery_00.png" :
-        (p->battery.battery_current <= (MIN_BATTERY + interval)) ? "battery_25.png" :
-        (p->battery.battery_current <= (MIN_BATTERY + 2 * interval)) ? "battery_50.png" :
-        (p->battery.battery_current <= (MIN_BATTERY + 3 * interval)) ? "battery_75.png" :
-        "battery_100.png");
+  sprintf(battery_state,"%s",
+  (p->battery.battery_current <= MIN_BATTERY) ? "battery_00.png" :
+  (p->battery.battery_current <= (MIN_BATTERY + interval)) ? "battery_25.png" :
+  (p->battery.battery_current <= (MIN_BATTERY + 2 * interval)) ? "battery_50.png" :
+  (p->battery.battery_current <= (MIN_BATTERY + 3 * interval)) ? "battery_75.png" :
+  "battery_100.png");
 
 
-    sprintf(fullpath, "/viacast/lcd/icons/%s", battery_state);
-    if (p->battery.battery_current)
+  sprintf(fullpath, "/viacast/lcd/icons/%s", battery_state);
+  if (p->battery.battery_current > 0){
     p->icon_r[0] = gp_load_png(fullpath, NULL); 
-
-    /* battery end */
-
-    for (i = 1; i < n; i++) {
-      sprintf(fullpath, "%s/%s", directory_scanr, p->icons_list[i]->d_name);
-      p->icon_r[i] = gp_load_png(fullpath, NULL);
-    }
   }
+  /* battery end */
 
-  while (0);
+  for (i = 1; i < n; i++) {
+    sprintf(fullpath, "%s/%s", directory_scanr, p->icons_list[i]->d_name);
+    p->icon_r[i] = gp_load_png(fullpath, NULL);
+  } 
 }
 
 void destroy_icons(Driver *drvthis)
@@ -352,13 +345,15 @@ void destroy_icons(Driver *drvthis)
 
   p->icon_l2 = NULL;
 
-  for (i = 0; i < p->n_icons_r; i++) {
-    if (p->icon_r[i])
+  for (i = 1; i < p->n_icons_r; i++) {
+    if (p->icon_r[i] != NULL){
       gp_pixmap_free(p->icon_r[i]);
+    }
   }
 
-  if (p->icon_r)
+  if (p->icon_r){
     free(p->icon_r);
+  }
 
   p->icon_r = NULL;
 }
