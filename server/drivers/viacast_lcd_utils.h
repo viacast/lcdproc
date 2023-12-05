@@ -12,6 +12,8 @@
 #define N_BATTERY_STATE 4
 
 typedef struct {
+    uint8_t max_battery ;
+    uint8_t min_battery ;
     uint8_t battery_values[SIZE];
     uint8_t battery_current;
     uint8_t head;  // Points to the position to insert the next element

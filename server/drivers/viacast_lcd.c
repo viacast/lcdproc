@@ -869,6 +869,24 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->width = w;
   p->height = h;
 
+  /* Which max battery ?*/
+  tmp = drvthis->config_get_int(drvthis->name, "MaxBattery", 0, DEFAULT_MAX_BATTERY);
+  if (tmp > DEFAULT_MAX_BATTERY) {
+    report(RPT_WARNING, "%s: Using default maxBattery %d",
+           drvthis->name, DEFAULT_MAX_BATTERY);
+    tmp = DEFAULT_MAX_BATTERY;
+  }
+  p->battery.max_battery = (uint8_t)tmp;
+
+    /* Which min battery ?*/
+  tmp = drvthis->config_get_int(drvthis->name, "MinBattery", 0, DEFAULT_MIN_BATTERY);
+  if (tmp < DEFAULT_MIN_BATTERY) {
+    report(RPT_WARNING, "%s: Using default minBattery %d",
+           drvthis->name, DEFAULT_MIN_BATTERY);
+    tmp = DEFAULT_MIN_BATTERY;
+  }
+  p->battery.minx_battery = (uint8_t)tmp;
+
   /* Which rotate ?*/
   tmp = drvthis->config_get_int(drvthis->name, "Rotate", 0, DEFAULT_ROTATE);
   if ((tmp > 3) || (tmp < 0)) {
