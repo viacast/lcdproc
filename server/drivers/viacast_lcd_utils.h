@@ -4,21 +4,42 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/inotify.h>
+#include <sys/types.h>
 
-#define SIZE 10
+#define SIZE 3
 #define MAX_DELTA 2
-#define MAX_BATTERY 148
-#define MIN_BATTERY 120
 #define N_BATTERY_STATE 4
 
+/**
+ * Represent a battery
+ * \param state     State of battery
+ *   state:
+ *    0: font
+ *    1: > up 75
+ *    2: > between 50 and 75
+ *    3: > between 25 and 50
+ *    4: > down 25
+ *    5: = 0
+ */
 typedef struct {
-    uint8_t max_battery ;
-    uint8_t min_battery ;
-    uint8_t battery_values[SIZE];
-    uint8_t battery_current;
-    uint8_t head;  // Points to the position to insert the next element
+  int state; /* 0: font;
+    1:  up 75;
+    2:  between 50 and 75;
+    3:  between 25 and 50;
+    4:  down 25;
+    5:  equal 0   
+    */
+  int new_state;
+  uint8_t max_battery;
+  uint8_t min_battery;
+  uint8_t min_font;
+  uint8_t battery_values[SIZE];
+  uint8_t battery_current;
+  uint8_t head; // Points to the position to insert the next element
 } Battery;
 
 int filter(const struct dirent *name);
 
-void check_inotify_event(struct inotify_event *i, int *reload_icons);   
+void check_inotify_event(struct inotify_event *i, int *reload_icons);
+
+void updateBattery(Battery* battery, uint8_t battery_read);

@@ -310,22 +310,6 @@ int reload_icons(Driver *drvthis)
       p->icon_r[i] = gp_load_png(fullpath, NULL);
     }
   } while (0);
-
-  /* battery start */
-  uint8_t interval = ((MAX_BATTERY - MIN_BATTERY)/N_BATTERY_STATE);
-  char battery_state[32];
-  sprintf(battery_state,"%s",
-    (p->battery.battery_current <= MIN_BATTERY) ? "battery_00.png" :
-    (p->battery.battery_current <= (MIN_BATTERY + interval)) ? "battery_25.png" :
-    (p->battery.battery_current <= (MIN_BATTERY + 2 * interval)) ? "battery_50.png" :
-    (p->battery.battery_current <= (MIN_BATTERY + 3 * interval)) ? "battery_75.png" :
-    "battery_100.png"); 
-        
-   sprintf(fullpath, "/viacast/lcd/icons/%s", battery_state);
-  if (p->battery.battery_current > 0){
-    p->icon_battery = gp_load_png(fullpath, NULL); 
-  }
-  /* battery end */
 }
 
 void destroy_icons(Driver *drvthis)
@@ -831,6 +815,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   memset(p->battery.battery_values, 0, sizeof(p->battery.battery_values));
   p->battery.battery_current = 0;
   p->battery.head = 0;
+  p->battery.state = -1;
   debug(RPT_INFO, "viacast_lcd: init(%p)", drvthis);
 
   /* Read config file */
@@ -871,7 +856,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 
   /* Which max battery ?*/
   tmp = drvthis->config_get_int(drvthis->name, "MaxBattery", 0, DEFAULT_MAX_BATTERY);
-  if (tmp > DEFAULT_MAX_BATTERY) {
+  if (tmp >= DEFAULT_MAX_BATTERY) {
     report(RPT_WARNING, "%s: Using default maxBattery %d",
            drvthis->name, DEFAULT_MAX_BATTERY);
     tmp = DEFAULT_MAX_BATTERY;
@@ -880,12 +865,21 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 
     /* Which min battery ?*/
   tmp = drvthis->config_get_int(drvthis->name, "MinBattery", 0, DEFAULT_MIN_BATTERY);
-  if (tmp < DEFAULT_MIN_BATTERY) {
+  if (tmp <= DEFAULT_MIN_BATTERY) {
     report(RPT_WARNING, "%s: Using default minBattery %d",
            drvthis->name, DEFAULT_MIN_BATTERY);
     tmp = DEFAULT_MIN_BATTERY;
   }
-  p->battery.minx_battery = (uint8_t)tmp;
+  p->battery.min_battery = (uint8_t)tmp;
+
+  /* Which min font ?*/
+  tmp = drvthis->config_get_int(drvthis->name, "MinFont", 0, DEFAULT_MIN_FONT);
+  if (tmp <= DEFAULT_MIN_FONT) {
+    report(RPT_WARNING, "%s: Using default minFont %d",
+           drvthis->name, DEFAULT_MIN_FONT);
+    tmp = DEFAULT_MIN_FONT;
+  }
+  p->battery.min_font = (uint8_t)tmp;
 
   /* Which rotate ?*/
   tmp = drvthis->config_get_int(drvthis->name, "Rotate", 0, DEFAULT_ROTATE);
@@ -1290,10 +1284,12 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
 {
   PrivateData *p = drvthis->private_data;
   char key[MAX_DEVICES][128] = {{0}};
+  char fullpath[1024];
   int i = 0;
   int index = 0;
   int key_pressed = 0;
   uint8_t battery_read = 0;
+  int battery_state = 0;
   struct timeval current_time, delay_time;
 
   gettimeofday(&current_time, NULL);
@@ -1348,13 +1344,22 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
       break;
     case 'B':
       battery_read= key[i][1];
-      appendValueBattery(&p->battery, battery_read);
-      if ( tryUpdateBatteryValue(&p->battery)) {
-        report(RPT_INFO, "Update battery to  :%u", p->battery.battery_current);
-        p->reload_icons = 1;  
-      }
+      fprintf(stderr, "battery_read: %u\n\n\n\n", battery_read);
+      report(RPT_INFO, "Battery read:%u", battery_read);
+      updateBattery(&p->battery, battery_read);
 
+      fprintf(stderr, "battery_states: %d,%d\n\n\n\n", p->battery.new_state, p->battery.state );
+
+      
+      if (p->battery.new_state != p->battery.state){
+        report(RPT_INFO, "Loading new icon state:%d", p->battery.new_state);
+
+        sprintf(fullpath, "/viacast/lcd/icons/battery_state_%u.png", p->battery.new_state);
+        p->icon_battery = gp_load_png(fullpath, NULL);
+        p->battery.state = p->battery.new_state;
+      }
       break;
+    
     default:
       break;
     }
