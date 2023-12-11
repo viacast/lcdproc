@@ -289,12 +289,6 @@ int reload_icons(Driver *drvthis)
 
   const char *directory_scanr = "/tmp/status_bar/right";
   n = scandir(directory_scanr, &p->icons_list, filter, alphasort);
-  
-  n = n < 0 ? 1 : n++ // battery icon
-
-  
-  p->n_icons_r = n;
-  p->icon_r = (gp_pixmap **)malloc(sizeof(gp_pixmap *) * n);
 
   do {
     if (n <= 0) {
