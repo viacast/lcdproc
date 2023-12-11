@@ -1344,14 +1344,10 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
       break;
     case 'B':
       battery_read= key[i][1];
-      fprintf(stderr, "battery_read: %u\n\n\n\n", battery_read);
-      report(RPT_INFO, "Battery read:%u", battery_read);
       updateBattery(&p->battery, battery_read);
-
-      fprintf(stderr, "battery_states: %d,%d\n\n\n\n", p->battery.new_state, p->battery.state );
-
-      
+    
       if (p->battery.new_state != p->battery.state){
+        report(RPT_INFO, "Battery read:%u", battery_read);
         report(RPT_INFO, "Loading new icon state:%d", p->battery.new_state);
 
         sprintf(fullpath, "/viacast/lcd/icons/battery_state_%u.png", p->battery.new_state);

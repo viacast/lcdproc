@@ -62,9 +62,6 @@ void updateBattery(Battery *battery, uint8_t battery_read) {
   uint8_t interval =
       ((battery->max_battery - battery->min_battery) / N_BATTERY_STATE);
 
-  fprintf(stderr, "Before interval: %u, current: %u, min_battery: %u\n", interval,
-          battery->battery_current, battery->min_battery);
-
   if (battery_read > battery->min_font) {
     battery->new_state = 0;
     if (battery->state != 0) {
@@ -78,11 +75,6 @@ void updateBattery(Battery *battery, uint8_t battery_read) {
     battery->new_state = battery->state;
     return;
   }
-
-
-  
-  fprintf(stderr, "After interval: %u, current: %u, min_battery: %u\n", interval,
-          battery->battery_current, battery->min_battery);
   
   battery->new_state =
       battery->battery_current <= battery->min_battery + (0 * interval)   ? 5
