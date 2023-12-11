@@ -304,6 +304,8 @@ int reload_icons(Driver *drvthis)
       p->icon_r[i] = gp_load_png(fullpath, NULL);
     }
   } while (0);
+
+  return 1;
 }
 
 void destroy_icons(Driver *drvthis)
@@ -349,7 +351,6 @@ void draw_icons_1(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
-  int text_height = gp_text_height(&p->text_style);
 
   if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) && (!p->icon_battery))
     return;
@@ -361,9 +362,6 @@ void draw_icons_1(Driver *drvthis)
   gp_coord coordy = gp_pixmap_h(p->pixmap) - height_status_bar;
 
   gp_pixmap *temp_icon = NULL;
-
-  gp_coord y_status_bar = coordy;
-  gp_coord x_status_bar = 0;
 
   gp_coord x_status_bar_back = 0;
   gp_coord y_status_bar_back = 0;
@@ -501,7 +499,6 @@ void draw_icons_3(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
-  int text_height = gp_text_height(&p->text_style);
 
   if ((!p->icon_l) && (!p->icon_r) && (!p->icon_battery))
     return;
@@ -581,6 +578,7 @@ void draw_icons_3(Driver *drvthis)
     x_width = gp_pixmap_w(p->icon_l[i]) + DEFAULT_H_SPACE_ICON;
     if (x_width > x_available)
       continue;
+
 
     if (need_create_status_bar) {
       gp_filter_brightness_ex(p->pixmap, x_status_bar_back, y_status_bar_back,
@@ -822,7 +820,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
     if (strcmp(p->device[i], NO_DEVICE) == 0) {
       continue;
     }
-    p->device[i][sizeof(p->device) - 1] = '\0';
+    p->device[i][sizeof(p->device[i]) - 1] = '\0';
     report(RPT_INFO, "%s: using Device %s", drvthis->name, p->device[i]);
   }
 
@@ -1283,7 +1281,6 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
   int index = 0;
   int key_pressed = 0;
   uint8_t battery_read = 0;
-  int battery_state = 0;
   struct timeval current_time, delay_time;
 
   gettimeofday(&current_time, NULL);
