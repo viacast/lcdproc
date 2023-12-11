@@ -1346,6 +1346,23 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
         p->battery.state = p->battery.new_state;
       }
       break;
+
+    // Accelerometer
+    case 'X':
+      viacast_lcd_set_rotate(drvthis, 0);
+      return NULL;
+
+    case 'y':
+      viacast_lcd_set_rotate(drvthis, 1);
+      return NULL;
+
+    case 'x':
+      viacast_lcd_set_rotate(drvthis, 2);
+      return NULL;
+
+    case 'Y':
+      viacast_lcd_set_rotate(drvthis, 3);
+      return NULL;
     
     default:
       break;

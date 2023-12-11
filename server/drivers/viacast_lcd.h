@@ -1,6 +1,10 @@
 #ifndef VIACAST_LCD_H
 #define VIACAST_LCD_H
 
+#ifndef LCD_H
+#include "lcd.h"
+#endif
+
 #define NO_DEVICE         ""
 #define DEFAULT_DEVICE		"/dev/ttyACM0"
 #define DEFAULT_FBDEV		"/dev/fb0"
@@ -26,6 +30,7 @@ MODULE_EXPORT void viacast_lcd_flush (Driver *drvthis);
 MODULE_EXPORT void viacast_lcd_string (Driver *drvthis, int x, int y, const char string[]);
 MODULE_EXPORT void viacast_lcd_chr (Driver *drvthis, int x, int y, char c);
 MODULE_EXPORT void viacast_lcd_set_contrast (Driver *drvthis, int promille);
+MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate);
 MODULE_EXPORT void viacast_lcd_backlight (Driver *drvthis, int on);
 MODULE_EXPORT const char * viacast_lcd_get_info (Driver *drvthis);
 
