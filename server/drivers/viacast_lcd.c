@@ -21,6 +21,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
  */
 
+#include "core/gp_pixmap.h"
+#include "text/gp_text.h"
 #include "text/gp_text_metric.h"
 #include <stdint.h>
 #ifdef HAVE_CONFIG_H
@@ -534,6 +536,8 @@ void draw_icons_3(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
+  char string[5];
+
 
   if ((!p->icon_l) && (!p->icon_r) && (!p->icon_battery))
     return;
@@ -569,6 +573,20 @@ void draw_icons_3(Driver *drvthis)
       need_create_status_bar = 0;
     }
 
+
+    sprintf(string, "%u%%", p->battery.battery_percentual);
+    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string) -2 ));
+    x_available -= x_width;
+    
+
+    gp_text(p->pixmap, &p->text_style_battery, coordx + gp_pixmap_w(p->pixmap) - x_width, gp_pixmap_h(p->pixmap) - gp_text_height(&p->text_style_battery),
+              GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+              p->black_pixel, string);
+
+    coordx += x_width + 2 ;
+
+
+     
     temp_icon = gp_filter_rotate_180_alloc(p->icon_battery, NULL);
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
