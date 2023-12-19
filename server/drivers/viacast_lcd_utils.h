@@ -7,7 +7,7 @@
 #include <sys/types.h>
 
 #define SIZE 3
-#define MAX_DELTA 2
+#define MAX_DELTA 1
 #define N_BATTERY_STATE 4
 
 /**
@@ -35,6 +35,7 @@ typedef struct {
   uint8_t min_font;
   uint8_t battery_values[SIZE];
   uint8_t battery_current;
+  uint32_t battery_percentual;
   uint8_t head; // Points to the position to insert the next element
 } Battery;
 
