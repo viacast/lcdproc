@@ -561,7 +561,6 @@ void draw_icons_3(Driver *drvthis)
     if (!p->icon_battery)
       break;
 
-    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
     if (x_width > x_available)
       continue;
 
@@ -575,7 +574,7 @@ void draw_icons_3(Driver *drvthis)
 
 
     sprintf(string, "%u%%", p->battery.battery_percentual);
-    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string) -2 ));
+    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string)));
     x_available -= x_width;
     
 
@@ -688,6 +687,7 @@ void draw_icons_2(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
+  char string[5];
 
   if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) && (!p->icon_battery))
     return;
@@ -710,9 +710,7 @@ void draw_icons_2(Driver *drvthis)
     if (!p->icon_battery)
       break;;
 
-    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
-    if (x_width > x_available)
-      continue;
+
 
     if (need_create_status_bar) {
       gp_filter_brightness_ex(p->pixmap, x_status_bar, y_status_bar,
@@ -723,8 +721,23 @@ void draw_icons_2(Driver *drvthis)
       need_create_status_bar = 0;
     }
 
+
+    sprintf(string, "%u%%", p->battery.battery_percentual);
+    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string) +1));
     coordx -= x_width;
     x_available -= x_width;
+    
+    gp_text(p->pixmap, &p->text_style_battery, coordx, gp_text_height(&p->text_style_battery),
+              GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+              p->black_pixel, string);
+
+    coordx -= x_width;
+    x_available -= x_width;
+
+    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
+    if (x_width > x_available)
+      continue;
+
     gp_blit_clipped(p->icon_battery, 0, 0, gp_pixmap_w(p->icon_battery),
                     gp_pixmap_h(p->icon_battery), p->pixmap, coordx, coordy);
   } while (0);
