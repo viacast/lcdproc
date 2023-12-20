@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/inotify.h>
 #include <sys/types.h>
@@ -40,6 +41,8 @@ typedef struct {
 } Battery;
 
 int filter(const struct dirent *name);
+
+bool writeInFile(const char * filename, char *content);
 
 void check_inotify_event(struct inotify_event *i, int *reload_icons);
 

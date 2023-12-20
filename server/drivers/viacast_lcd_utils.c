@@ -2,6 +2,17 @@
 #include <stdint.h>
 #include <stdio.h>
 
+bool writeInFile(const char *filename, char *content) {
+  FILE *fp = fopen(filename, "w");
+  if (!fp) {
+    return false;
+  }
+
+  fprintf(fp, "%s", content);
+  fclose(fp);
+  return true;
+}
+
 void appendValueBattery(Battery *battery, uint8_t value) {
   if (value > battery->max_battery) {
     value = battery->max_battery;
@@ -61,12 +72,9 @@ check_inotify_event(struct inotify_event *i, int *reload_icons) {
 void getPercentBattery(Battery *battery) {
 
   battery->battery_percentual =
-    (uint32_t)(((battery->battery_current - battery->min_battery) * 100U) /
-    (battery->max_battery - battery->min_battery));
-    
-  // battery->battery_percentual =
-  //     (uint32_t)(((battery->battery_current - battery->min_battery) *100)/
-  //      (uint32_t)(battery->max_battery - battery->min_battery)) *
+      (uint32_t)(((battery->battery_current - battery->min_battery) * 100U) /
+                 (battery->max_battery - battery->min_battery));
+
 
   fprintf(stderr, "Current: %u\n", battery->battery_current);
   fprintf(stderr, "Min: %u\n", battery->min_battery);
@@ -83,6 +91,9 @@ void getPercentBattery(Battery *battery) {
 }
 
 void updateBattery(Battery *battery, uint8_t battery_read) {
+
+  char battery_percentage[16];
+  const char *filename = "/tmp/battery_percentage";
 
   uint8_t interval =
       ((battery->max_battery - battery->min_battery) / N_BATTERY_STATE);
@@ -103,17 +114,13 @@ void updateBattery(Battery *battery, uint8_t battery_read) {
   }
 
   getPercentBattery(battery);
+  sprintf(battery_percentage, "%u", battery->battery_percentual);
+  writeInFile(filename, battery_percentage);
 
   battery->new_state =
-      battery->battery_current <= battery->min_battery + (0 * interval)
-          ? 5
-          : battery->battery_current <= battery->min_battery + (1 * interval)
-                ? 4
-                : battery->battery_current <=
-                          battery->min_battery + (2 * interval)
-                      ? 3
-                      : battery->battery_current <=
-                                battery->min_battery + (3 * interval)
-                            ? 2
-                            : 1;
+      battery->battery_current <= battery->min_battery + (0 * interval)   ? 5
+      : battery->battery_current <= battery->min_battery + (1 * interval) ? 4
+      : battery->battery_current <= battery->min_battery + (2 * interval) ? 3
+      : battery->battery_current <= battery->min_battery + (3 * interval) ? 2
+                                                                          : 1;
 }
