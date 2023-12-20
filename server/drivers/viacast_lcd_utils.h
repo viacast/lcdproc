@@ -2,12 +2,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/inotify.h>
 #include <sys/types.h>
 
 #define SIZE 3
-#define MAX_DELTA 2
+#define MAX_DELTA 1
 #define N_BATTERY_STATE 4
 
 /**
@@ -35,10 +36,13 @@ typedef struct {
   uint8_t min_font;
   uint8_t battery_values[SIZE];
   uint8_t battery_current;
+  uint32_t battery_percentual;
   uint8_t head; // Points to the position to insert the next element
 } Battery;
 
 int filter(const struct dirent *name);
+
+bool writeInFile(const char * filename, char *content);
 
 void check_inotify_event(struct inotify_event *i, int *reload_icons);
 

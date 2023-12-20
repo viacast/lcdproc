@@ -21,6 +21,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
  */
 
+#include "core/gp_pixmap.h"
+#include "text/gp_text.h"
+#include "text/gp_text_metric.h"
 #include <stdint.h>
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -119,6 +122,7 @@ typedef struct text_private_data {
   gp_pixel black_pixel;
   gp_pixel white_pixel;
   gp_text_style text_style;
+  gp_text_style text_style_battery;
 } PrivateData;
 
 /* Vars for the server core */
@@ -166,6 +170,18 @@ void sighandler(const int signal, void *ptr)
     p->display_text = 1;
     p->status_bar = 1;
     return;
+  }
+}
+
+void revstr(char *str1)
+{
+  int i, len, temp;
+  len = strlen(str1);
+
+  for (i = 0; i < len / 2; i++) {
+    temp = str1[i];
+    str1[i] = str1[len - i - 1];
+    str1[len - i - 1] = temp;
   }
 }
 
@@ -234,6 +250,12 @@ void viacast_lcd_setup_gfxprim(Driver *drvthis)
       gp_pixmap_rotate_ccw(p->pixmap);
   } while (0);
   p->text_style = tmp_style;
+
+  const gp_font_family *font_family;
+  font_family = gp_font_family_lookup("tiny");
+  tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
+  p->text_style_battery = tmp_style;
+
 }
 
 int reload_icons(Driver *drvthis)
@@ -351,6 +373,7 @@ void draw_icons_1(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
+  char string[5];
 
   if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) && (!p->icon_battery))
     return;
@@ -386,7 +409,21 @@ void draw_icons_1(Driver *drvthis)
       need_create_status_bar = 0;
     }
 
+
+    sprintf(string, "%d%%", p->battery.battery_percentual);
+    revstr(string);
+
+    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string) + 1));
+    coordx += x_width;
+    x_available -= x_width;
+    
+
+    gp_text(p->pixmap, &p->text_style_battery, coordx, gp_text_height(&p->text_style_battery),
+              GP_ALIGN_LEFT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+              p->black_pixel, string);
+
     x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
+
 
     if (x_width > x_available)
       break;
@@ -499,6 +536,8 @@ void draw_icons_3(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
+  char string[5];
+
 
   if ((!p->icon_l) && (!p->icon_r) && (!p->icon_battery))
     return;
@@ -522,7 +561,6 @@ void draw_icons_3(Driver *drvthis)
     if (!p->icon_battery)
       break;
 
-    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
     if (x_width > x_available)
       continue;
 
@@ -534,6 +572,20 @@ void draw_icons_3(Driver *drvthis)
       need_create_status_bar = 0;
     }
 
+
+    sprintf(string, "%u%%", p->battery.battery_percentual);
+    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string)));
+    x_available -= x_width;
+    
+
+    gp_text(p->pixmap, &p->text_style_battery, coordx + gp_pixmap_w(p->pixmap) - x_width, gp_pixmap_h(p->pixmap) - gp_text_height(&p->text_style_battery),
+              GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+              p->black_pixel, string);
+
+    coordx += x_width + 2 ;
+
+
+     
     temp_icon = gp_filter_rotate_180_alloc(p->icon_battery, NULL);
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
@@ -635,6 +687,7 @@ void draw_icons_2(Driver *drvthis)
 {
 
   PrivateData *p = drvthis->private_data;
+  char string[5];
 
   if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) && (!p->icon_battery))
     return;
@@ -657,9 +710,7 @@ void draw_icons_2(Driver *drvthis)
     if (!p->icon_battery)
       break;;
 
-    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
-    if (x_width > x_available)
-      continue;
+
 
     if (need_create_status_bar) {
       gp_filter_brightness_ex(p->pixmap, x_status_bar, y_status_bar,
@@ -670,8 +721,23 @@ void draw_icons_2(Driver *drvthis)
       need_create_status_bar = 0;
     }
 
+
+    sprintf(string, "%u%%", p->battery.battery_percentual);
+    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string) +1));
     coordx -= x_width;
     x_available -= x_width;
+    
+    gp_text(p->pixmap, &p->text_style_battery, coordx, gp_text_height(&p->text_style_battery),
+              GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+              p->black_pixel, string);
+
+    coordx -= x_width;
+    x_available -= x_width;
+
+    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
+    if (x_width > x_available)
+      continue;
+
     gp_blit_clipped(p->icon_battery, 0, 0, gp_pixmap_w(p->icon_battery),
                     gp_pixmap_h(p->icon_battery), p->pixmap, coordx, coordy);
   } while (0);
@@ -756,18 +822,6 @@ void draw_icons_2(Driver *drvthis)
                     gp_pixmap_h(p->icon_l2[i]), p->pixmap, coordx, coordy);
     x_available -= x_width;
     coordx += x_width;
-  }
-}
-
-void revstr(char *str1)
-{
-  int i, len, temp;
-  len = strlen(str1);
-
-  for (i = 0; i < len / 2; i++) {
-    temp = str1[i];
-    str1[i] = str1[len - i - 1];
-    str1[len - i - 1] = temp;
   }
 }
 

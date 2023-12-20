@@ -1,5 +1,17 @@
 #include "viacast_lcd_utils.h"
 #include <stdint.h>
+#include <stdio.h>
+
+bool writeInFile(const char *filename, char *content) {
+  FILE *fp = fopen(filename, "w");
+  if (!fp) {
+    return false;
+  }
+
+  fprintf(fp, "%s", content);
+  fclose(fp);
+  return true;
+}
 
 void appendValueBattery(Battery *battery, uint8_t value) {
   if (value > battery->max_battery) {
@@ -57,7 +69,31 @@ check_inotify_event(struct inotify_event *i, int *reload_icons) {
     *reload_icons = 1;
 }
 
+void getPercentBattery(Battery *battery) {
+
+  battery->battery_percentual =
+      (uint32_t)(((battery->battery_current - battery->min_battery) * 100U) /
+                 (battery->max_battery - battery->min_battery));
+
+
+  fprintf(stderr, "Current: %u\n", battery->battery_current);
+  fprintf(stderr, "Min: %u\n", battery->min_battery);
+  fprintf(stderr, "Max: %u\n", battery->max_battery);
+  fprintf(stderr, "Percent: %d\n", battery->battery_percentual);
+
+  if (battery->battery_percentual > 100) {
+    battery->battery_percentual = 100;
+  }
+
+  if (battery->battery_percentual < 0) {
+    battery->battery_percentual = 0;
+  }
+}
+
 void updateBattery(Battery *battery, uint8_t battery_read) {
+
+  char battery_percentage[16];
+  const char *filename = "/tmp/battery_percentage";
 
   uint8_t interval =
       ((battery->max_battery - battery->min_battery) / N_BATTERY_STATE);
@@ -72,10 +108,15 @@ void updateBattery(Battery *battery, uint8_t battery_read) {
 
   appendValueBattery(battery, battery_read);
   if (!tryUpdateBatteryValue(battery)) {
+    getPercentBattery(battery);
     battery->new_state = battery->state;
     return;
   }
-  
+
+  getPercentBattery(battery);
+  sprintf(battery_percentage, "%u", battery->battery_percentual);
+  writeInFile(filename, battery_percentage);
+
   battery->new_state =
       battery->battery_current <= battery->min_battery + (0 * interval)   ? 5
       : battery->battery_current <= battery->min_battery + (1 * interval) ? 4
