@@ -397,7 +397,7 @@ void draw_icons_1(Driver *drvthis) {
       need_create_status_bar = 0;
     }
 
-    sprintf(string, "%d%%", 95);
+    sprintf(string, "%u%%", p->battery.battery_percentual);
     revstr(string);
 
     x_width +=
@@ -889,7 +889,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
            DEFAULT_MAX_BATTERY);
     tmp = DEFAULT_MAX_BATTERY;
   }
-  p->battery.max_battery = (uint8_t)tmp;
+  p->battery.max_battery = (uint16_t)tmp;
 
   /* Which min battery ?*/
   tmp = drvthis->config_get_int(drvthis->name, "MinBattery", 0,
@@ -899,7 +899,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
            DEFAULT_MIN_BATTERY);
     tmp = DEFAULT_MIN_BATTERY;
   }
-  p->battery.min_battery = (uint8_t)tmp;
+  p->battery.min_battery = (uint16_t)tmp;
 
   /* Which min font ?*/
   tmp = drvthis->config_get_int(drvthis->name, "MinFont", 0, DEFAULT_MIN_FONT);
@@ -908,7 +908,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
            DEFAULT_MIN_FONT);
     tmp = DEFAULT_MIN_FONT;
   }
-  p->battery.min_font = (uint8_t)tmp;
+  p->battery.min_font = (uint16_t)tmp;
 
   /* Which rotate ?*/
   tmp = drvthis->config_get_int(drvthis->name, "Rotate", 0, DEFAULT_ROTATE);

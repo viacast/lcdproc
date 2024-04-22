@@ -26,15 +26,12 @@ bool readBatteryFromFile(const char *filename, Battery *battery) {
          &battery->voltage_power_supply);
   fclose(fp);
 
-  fprintf(stderr, "%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16,
-         battery->is_drain_ext_battery, battery->voltage_ext_battery,
-         battery->voltage_int_battery, battery->is_power_supply,
-         battery->voltage_power_supply);
 
   return true;
 }
 
 void appendValueBattery(Battery *battery, uint16_t value) {
+
   if (value > battery->max_battery) {
     value = battery->max_battery;
   }
@@ -63,15 +60,13 @@ uint16_t getMeanBattery(Battery *battery) {
   return result;
 }
 
-int tryUpdateBatteryValue(Battery *battery) {
+void tryUpdateBatteryCurrent(Battery *battery) {
   uint16_t mean_battery = getMeanBattery(battery);
   int32_t delta = battery->battery_current - mean_battery;
 
   if (delta > MAX_DELTA || delta < -MAX_DELTA) {
     battery->battery_current = mean_battery;
-    return 1;
   }
-  return 0;
 }
 
 int filter(const struct dirent *name) {
@@ -96,10 +91,6 @@ void getPercentBattery(Battery *battery) {
       (uint32_t)(((battery->battery_current - battery->min_battery) * 100U) /
                  (battery->max_battery - battery->min_battery));
 
-  fprintf(stderr, "Current: %u\n", battery->battery_current);
-  fprintf(stderr, "Min: %u\n", battery->min_battery);
-  fprintf(stderr, "Max: %u\n", battery->max_battery);
-  fprintf(stderr, "Percent: %d\n", battery->battery_percentual);
 
   if (battery->battery_percentual > 100) {
     battery->battery_percentual = 100;
@@ -112,30 +103,23 @@ void getPercentBattery(Battery *battery) {
 
 void updateBattery(Battery *battery) {
 
-  if (battery->cycles_to_read < 10){
+  if (battery->cycles_to_read < 10) {
     battery->cycles_to_read++;
-    return ;
+    return;
   }
-  
-  battery->cycles_to_read =0;
+
+  battery->cycles_to_read = 0;
 
   uint8_t interval =
       ((battery->max_battery - battery->min_battery) / N_BATTERY_STATE);
 
   readBatteryFromFile("/tmp/battery-manager", battery);
-  
-  if (battery->is_power_supply == 1) {
-    battery->new_state = 0;
-    if (battery->state != 0) {
-      memset(battery->battery_values, 0, sizeof(battery->battery_values));
-    }
-    return;
-  }
-
   appendValueBattery(battery, battery->voltage_ext_battery);
   getPercentBattery(battery);
-  if (!tryUpdateBatteryValue(battery)) {
-    battery->new_state = battery->state;
+  tryUpdateBatteryCurrent(battery);
+
+  if (battery->is_power_supply == 1) {
+    battery->new_state = 0;
     return;
   }
 
