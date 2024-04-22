@@ -30,14 +30,23 @@ typedef struct {
     4:  down 25;
     5:  equal 0   
     */
+
+  uint16_t is_drain_ext_battery;
+  uint16_t voltage_ext_battery;
+  uint16_t voltage_int_battery;
+  uint16_t is_power_supply;
+  uint16_t voltage_power_supply;
+
+  u_int8_t cycles_to_read;
+  
   int new_state;
-  uint8_t max_battery;
-  uint8_t min_battery;
-  uint8_t min_font;
-  uint8_t battery_values[SIZE];
-  uint8_t battery_current;
+  uint16_t max_battery;
+  uint16_t min_battery;
+  uint16_t min_font;
+  uint16_t battery_values[SIZE];
+  uint16_t battery_current;
   uint32_t battery_percentual;
-  uint8_t head; // Points to the position to insert the next element
+  uint16_t head; // Points to the position to insert the next element
 } Battery;
 
 int filter(const struct dirent *name);
@@ -46,4 +55,4 @@ bool writeInFile(const char * filename, char *content);
 
 void check_inotify_event(struct inotify_event *i, int *reload_icons);
 
-void updateBattery(Battery* battery, uint8_t battery_read);
+void updateBattery(Battery* battery);
