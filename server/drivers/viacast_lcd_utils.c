@@ -1,4 +1,5 @@
 #include "viacast_lcd_utils.h"
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -13,7 +14,27 @@ bool writeInFile(const char *filename, char *content) {
   return true;
 }
 
-void appendValueBattery(Battery *battery, uint8_t value) {
+bool readBatteryFromFile(const char *filename, Battery *battery) {
+  FILE *fp = fopen(filename, "r");
+  if (!fp) {
+    return false;
+  }
+
+  fscanf(fp, "%" SCNu16 ",%" SCNu16 ",%" SCNu16 ",%" SCNu16 ",%" SCNu16,
+         &battery->is_drain_ext_battery, &battery->voltage_ext_battery,
+         &battery->voltage_int_battery, &battery->is_power_supply,
+         &battery->voltage_power_supply);
+  fclose(fp);
+
+  fprintf(stderr, "%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16,
+         battery->is_drain_ext_battery, battery->voltage_ext_battery,
+         battery->voltage_int_battery, battery->is_power_supply,
+         battery->voltage_power_supply);
+
+  return true;
+}
+
+void appendValueBattery(Battery *battery, uint16_t value) {
   if (value > battery->max_battery) {
     value = battery->max_battery;
   }
@@ -26,10 +47,10 @@ void appendValueBattery(Battery *battery, uint8_t value) {
   battery->head = (battery->head + 1) % SIZE;
 }
 
-uint8_t getMeanBattery(Battery *battery) {
+uint16_t getMeanBattery(Battery *battery) {
   int count = 0;
   int sum = 0;
-  uint8_t result = 0;
+  uint16_t result = 0;
   for (int i = 0; i < SIZE; ++i) {
     if (battery->battery_values[i] <= 0) {
       continue;
@@ -38,12 +59,12 @@ uint8_t getMeanBattery(Battery *battery) {
     sum += battery->battery_values[i];
     count++;
   }
-  result = count > 0 ? (uint8_t)(sum / count) : 0;
+  result = count > 0 ? (uint16_t)(sum / count) : 0;
   return result;
 }
 
 int tryUpdateBatteryValue(Battery *battery) {
-  uint8_t mean_battery = getMeanBattery(battery);
+  uint16_t mean_battery = getMeanBattery(battery);
   int32_t delta = battery->battery_current - mean_battery;
 
   if (delta > MAX_DELTA || delta < -MAX_DELTA) {
@@ -75,7 +96,6 @@ void getPercentBattery(Battery *battery) {
       (uint32_t)(((battery->battery_current - battery->min_battery) * 100U) /
                  (battery->max_battery - battery->min_battery));
 
-
   fprintf(stderr, "Current: %u\n", battery->battery_current);
   fprintf(stderr, "Min: %u\n", battery->min_battery);
   fprintf(stderr, "Max: %u\n", battery->max_battery);
@@ -90,15 +110,21 @@ void getPercentBattery(Battery *battery) {
   }
 }
 
-void updateBattery(Battery *battery, uint8_t battery_read) {
+void updateBattery(Battery *battery) {
 
-  char battery_percentage[16];
-  const char *filename = "/tmp/battery_percentage";
+  if (battery->cycles_to_read < 10){
+    battery->cycles_to_read++;
+    return ;
+  }
+  
+  battery->cycles_to_read =0;
 
   uint8_t interval =
       ((battery->max_battery - battery->min_battery) / N_BATTERY_STATE);
 
-  if (battery_read > battery->min_font) {
+  readBatteryFromFile("/tmp/battery-manager", battery);
+  
+  if (battery->is_power_supply == 1) {
     battery->new_state = 0;
     if (battery->state != 0) {
       memset(battery->battery_values, 0, sizeof(battery->battery_values));
@@ -106,16 +132,12 @@ void updateBattery(Battery *battery, uint8_t battery_read) {
     return;
   }
 
-  appendValueBattery(battery, battery_read);
+  appendValueBattery(battery, battery->voltage_ext_battery);
+  getPercentBattery(battery);
   if (!tryUpdateBatteryValue(battery)) {
-    getPercentBattery(battery);
     battery->new_state = battery->state;
     return;
   }
-
-  getPercentBattery(battery);
-  sprintf(battery_percentage, "%u", battery->battery_percentual);
-  writeInFile(filename, battery_percentage);
 
   battery->new_state =
       battery->battery_current <= battery->min_battery + (0 * interval)   ? 5
