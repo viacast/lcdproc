@@ -56,15 +56,13 @@
 #define ValidX(x)                                                              \
   if ((x) > p->width) {                                                        \
     (x) = p->width;                                                            \
-  }                                                                            \
-  else                                                                         \
+  } else                                                                       \
     (x) = (x) < 1 ? 1 : (x);
 
 #define ValidY(y)                                                              \
   if ((y) > p->height) {                                                       \
     (y) = p->height;                                                           \
-  }                                                                            \
-  else                                                                         \
+  } else                                                                       \
     (y) = (y) < 1 ? 1 : (y);
 
 #define MAX_DEVICES 4
@@ -144,11 +142,8 @@ void sighandler(const int signal, void *ptr);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
-void sighandler(const int signal, void *ptr)
-{
+void sighandler(const int signal, void *ptr) {
   static PrivateData *p = NULL;
-
- 
 
   if (p == NULL) {
     p = ptr;
@@ -173,8 +168,7 @@ void sighandler(const int signal, void *ptr)
   }
 }
 
-void revstr(char *str1)
-{
+void revstr(char *str1) {
   int i, len, temp;
   len = strlen(str1);
 
@@ -185,8 +179,7 @@ void revstr(char *str1)
   }
 }
 
-int viacast_lcd_setup_device(Driver *drvthis, int index)
-{
+int viacast_lcd_setup_device(Driver *drvthis, int index) {
   PrivateData *p = drvthis->private_data;
   struct termios portset;
 
@@ -227,8 +220,7 @@ int viacast_lcd_setup_device(Driver *drvthis, int index)
   return 0;
 }
 
-void viacast_lcd_setup_gfxprim(Driver *drvthis)
-{
+void viacast_lcd_setup_gfxprim(Driver *drvthis) {
 
   PrivateData *p = drvthis->private_data;
 
@@ -255,11 +247,9 @@ void viacast_lcd_setup_gfxprim(Driver *drvthis)
   font_family = gp_font_family_lookup("tiny");
   tmp_style.font = gp_font_family_face_lookup(font_family, GP_FONT_MONO);
   p->text_style_battery = tmp_style;
-
 }
 
-int reload_icons(Driver *drvthis)
-{
+int reload_icons(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
   destroy_icons(drvthis);
@@ -330,8 +320,7 @@ int reload_icons(Driver *drvthis)
   return 1;
 }
 
-void destroy_icons(Driver *drvthis)
-{
+void destroy_icons(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
   int i = 0;
@@ -357,20 +346,19 @@ void destroy_icons(Driver *drvthis)
   p->icon_l2 = NULL;
 
   for (i = 1; i < p->n_icons_r; i++) {
-    if (p->icon_r[i] != NULL){
+    if (p->icon_r[i] != NULL) {
       gp_pixmap_free(p->icon_r[i]);
     }
   }
 
-  if (p->icon_r){
+  if (p->icon_r) {
     free(p->icon_r);
   }
 
   p->icon_r = NULL;
 }
 
-void draw_icons_1(Driver *drvthis)
-{
+void draw_icons_1(Driver *drvthis) {
 
   PrivateData *p = drvthis->private_data;
   char string[5];
@@ -393,14 +381,14 @@ void draw_icons_1(Driver *drvthis)
   gp_coord x_width = 0;
 
   int need_create_status_bar = 1;
-  
+
   /* Battery */
   do {
 
-    if (!p->icon_battery){
-        break;
+    if (!p->icon_battery) {
+      break;
     }
-    
+
     if (need_create_status_bar) {
       gp_filter_brightness_ex(p->pixmap, x_status_bar_back, y_status_bar_back,
                               height_status_bar, gp_pixmap_w(p->pixmap),
@@ -409,28 +397,27 @@ void draw_icons_1(Driver *drvthis)
       need_create_status_bar = 0;
     }
 
-
-    sprintf(string, "%d%%", p->battery.battery_percentual);
+    sprintf(string, "%d%%", 95);
     revstr(string);
 
-    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string) + 1));
+    x_width +=
+        ((p->text_style_battery.font->max_glyph_width) * (strlen(string) + 1));
     coordx += x_width;
     x_available -= x_width;
-    
 
-    gp_text(p->pixmap, &p->text_style_battery, coordx, gp_text_height(&p->text_style_battery),
-              GP_ALIGN_LEFT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
-              p->black_pixel, string);
+    gp_text(p->pixmap, &p->text_style_battery, coordx,
+            gp_text_height(&p->text_style_battery),
+            GP_ALIGN_LEFT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+            p->black_pixel, string);
 
     x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
-
 
     if (x_width > x_available)
       break;
 
     temp_icon = gp_filter_rotate_180_alloc(p->icon_battery, NULL);
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
-                      gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
+                    gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
 
     coordx += x_width;
     x_available -= x_width;
@@ -532,12 +519,10 @@ void draw_icons_1(Driver *drvthis)
     gp_pixmap_free(temp_icon);
 }
 
-void draw_icons_3(Driver *drvthis)
-{
+void draw_icons_3(Driver *drvthis) {
 
   PrivateData *p = drvthis->private_data;
   char string[5];
-
 
   if ((!p->icon_l) && (!p->icon_r) && (!p->icon_battery))
     return;
@@ -572,20 +557,19 @@ void draw_icons_3(Driver *drvthis)
       need_create_status_bar = 0;
     }
 
-
     sprintf(string, "%u%%", p->battery.battery_percentual);
-    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string)));
+    x_width +=
+        ((p->text_style_battery.font->max_glyph_width) * (strlen(string)));
     x_available -= x_width;
-    
 
-    gp_text(p->pixmap, &p->text_style_battery, coordx + gp_pixmap_w(p->pixmap) - x_width, gp_pixmap_h(p->pixmap) - gp_text_height(&p->text_style_battery),
-              GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
-              p->black_pixel, string);
+    gp_text(p->pixmap, &p->text_style_battery,
+            coordx + gp_pixmap_w(p->pixmap) - x_width,
+            gp_pixmap_h(p->pixmap) - gp_text_height(&p->text_style_battery),
+            GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+            p->black_pixel, string);
 
-    coordx += x_width + 2 ;
+    coordx += x_width + 2;
 
-
-     
     temp_icon = gp_filter_rotate_180_alloc(p->icon_battery, NULL);
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
@@ -630,7 +614,6 @@ void draw_icons_3(Driver *drvthis)
     x_width = gp_pixmap_w(p->icon_l[i]) + DEFAULT_H_SPACE_ICON;
     if (x_width > x_available)
       continue;
-
 
     if (need_create_status_bar) {
       gp_filter_brightness_ex(p->pixmap, x_status_bar_back, y_status_bar_back,
@@ -683,8 +666,7 @@ void draw_icons_3(Driver *drvthis)
     gp_pixmap_free(temp_icon);
 }
 
-void draw_icons_2(Driver *drvthis)
-{
+void draw_icons_2(Driver *drvthis) {
 
   PrivateData *p = drvthis->private_data;
   char string[5];
@@ -708,9 +690,8 @@ void draw_icons_2(Driver *drvthis)
   /* Battery */
   do {
     if (!p->icon_battery)
-      break;;
-
-
+      break;
+    ;
 
     if (need_create_status_bar) {
       gp_filter_brightness_ex(p->pixmap, x_status_bar, y_status_bar,
@@ -721,15 +702,16 @@ void draw_icons_2(Driver *drvthis)
       need_create_status_bar = 0;
     }
 
-
     sprintf(string, "%u%%", p->battery.battery_percentual);
-    x_width += ((p->text_style_battery.font->max_glyph_width) * (strlen(string) +1));
+    x_width +=
+        ((p->text_style_battery.font->max_glyph_width) * (strlen(string) + 1));
     coordx -= x_width;
     x_available -= x_width;
-    
-    gp_text(p->pixmap, &p->text_style_battery, coordx, gp_text_height(&p->text_style_battery),
-              GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
-              p->black_pixel, string);
+
+    gp_text(p->pixmap, &p->text_style_battery, coordx,
+            gp_text_height(&p->text_style_battery),
+            GP_ALIGN_RIGHT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
+            p->black_pixel, string);
 
     coordx -= x_width;
     x_available -= x_width;
@@ -831,8 +813,7 @@ void draw_icons_2(Driver *drvthis)
  * \retval 0   Success.
  * \retval <0  Error.
  */
-MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
-{
+MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
   int tmp, w, h;
   char size[200] = DEFAULT_SIZE_LCDPROC;
 
@@ -901,19 +882,21 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->height = h;
 
   /* Which max battery ?*/
-  tmp = drvthis->config_get_int(drvthis->name, "MaxBattery", 0, DEFAULT_MAX_BATTERY);
+  tmp = drvthis->config_get_int(drvthis->name, "MaxBattery", 0,
+                                DEFAULT_MAX_BATTERY);
   if (tmp >= DEFAULT_MAX_BATTERY) {
-    report(RPT_WARNING, "%s: Using default maxBattery %d",
-           drvthis->name, DEFAULT_MAX_BATTERY);
+    report(RPT_WARNING, "%s: Using default maxBattery %d", drvthis->name,
+           DEFAULT_MAX_BATTERY);
     tmp = DEFAULT_MAX_BATTERY;
   }
   p->battery.max_battery = (uint8_t)tmp;
 
-    /* Which min battery ?*/
-  tmp = drvthis->config_get_int(drvthis->name, "MinBattery", 0, DEFAULT_MIN_BATTERY);
+  /* Which min battery ?*/
+  tmp = drvthis->config_get_int(drvthis->name, "MinBattery", 0,
+                                DEFAULT_MIN_BATTERY);
   if (tmp <= DEFAULT_MIN_BATTERY) {
-    report(RPT_WARNING, "%s: Using default minBattery %d",
-           drvthis->name, DEFAULT_MIN_BATTERY);
+    report(RPT_WARNING, "%s: Using default minBattery %d", drvthis->name,
+           DEFAULT_MIN_BATTERY);
     tmp = DEFAULT_MIN_BATTERY;
   }
   p->battery.min_battery = (uint8_t)tmp;
@@ -921,8 +904,8 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   /* Which min font ?*/
   tmp = drvthis->config_get_int(drvthis->name, "MinFont", 0, DEFAULT_MIN_FONT);
   if (tmp <= DEFAULT_MIN_FONT) {
-    report(RPT_WARNING, "%s: Using default minFont %d",
-           drvthis->name, DEFAULT_MIN_FONT);
+    report(RPT_WARNING, "%s: Using default minFont %d", drvthis->name,
+           DEFAULT_MIN_FONT);
     tmp = DEFAULT_MIN_FONT;
   }
   p->battery.min_font = (uint8_t)tmp;
@@ -1037,7 +1020,8 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
 
   p->black_pixel = gp_rgb_to_pixmap_pixel(0x00, 0x00, 0x00, p->pixmap);
   p->white_pixel = gp_rgb_to_pixmap_pixel(0xff, 0xff, 0xff, p->pixmap);
-  p->icon_battery = gp_pixmap_alloc(DEFAULT_HEIGHT_ICON, DEFAULT_HEIGHT_ICON, GP_PIXEL_RGB565);
+  p->icon_battery = gp_pixmap_alloc(DEFAULT_HEIGHT_ICON, DEFAULT_HEIGHT_ICON,
+                                    GP_PIXEL_RGB565);
   viacast_lcd_setup_gfxprim(drvthis);
 
   report(RPT_INFO, "Infos about fbdev\nwidth:%d\nheight:%d\nbits_per_pixel:%d",
@@ -1089,7 +1073,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
   p->reload_icons = 1;
 
   signal(SIGRTMIN, sighandler);
-  signal(SIGRTMIN+1, sighandler);
+  signal(SIGRTMIN + 1, sighandler);
   sighandler(SIGRTMAX, drvthis->private_data);
 
   report(RPT_INFO, "%s: init() done", drvthis->name);
@@ -1102,8 +1086,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis)
  * Close the driver (do necessary clean-up).
  * \param drvthis  Pointer to driver structure.
  */
-MODULE_EXPORT void viacast_lcd_close(Driver *drvthis)
-{
+MODULE_EXPORT void viacast_lcd_close(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
   report(RPT_DEBUG, "%s: Close", drvthis->name);
@@ -1139,8 +1122,7 @@ MODULE_EXPORT void viacast_lcd_close(Driver *drvthis)
  * \param drvthis  Pointer to driver structure.
  * \return  Number of characters the display is wide.
  */
-MODULE_EXPORT int viacast_lcd_width(Driver *drvthis)
-{
+MODULE_EXPORT int viacast_lcd_width(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
   return p->width;
 }
@@ -1150,8 +1132,7 @@ MODULE_EXPORT int viacast_lcd_width(Driver *drvthis)
  * \param drvthis  Pointer to driver structure.
  * \return  Number of characters the display is high.
  */
-MODULE_EXPORT int viacast_lcd_height(Driver *drvthis)
-{
+MODULE_EXPORT int viacast_lcd_height(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
   return p->height;
 }
@@ -1160,8 +1141,7 @@ MODULE_EXPORT int viacast_lcd_height(Driver *drvthis)
  * Clear the screen.
  * \param drvthis  Pointer to driver structure.
  */
-MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
-{
+MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
   memset(p->framebuf_lcdproc, ' ', p->width * p->height);
@@ -1182,9 +1162,20 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis)
  * Flush data on screen to the display.
  * \param drvthis  Pointer to driver structure.
  */
-MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
-{
+MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
+
+
+  updateBattery(&p->battery);
+
+  if (p->battery.new_state != p->battery.state) {
+    report(RPT_INFO, "Loading new icon state:%d", p->battery.new_state);
+    char fullpath[256];
+    sprintf(fullpath, "/viacast/lcd/icons/battery_state_%u.png",
+            p->battery.new_state);
+    p->icon_battery = gp_load_png(fullpath, NULL);
+    p->battery.state = p->battery.new_state;
+  }
 
   if (p->reload_icons) {
     reload_icons(drvthis);
@@ -1230,8 +1221,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
               p->black_pixel, string);
       y += text_height;
     }
-  }
-  else if (p->rotate == 3) {
+  } else if (p->rotate == 3) {
 
     draw_icons_3(drvthis);
 
@@ -1243,8 +1233,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
               p->white_pixel, p->black_pixel, string);
       y -= text_height;
     }
-  }
-  else if (!p->resize) {
+  } else if (!p->resize) {
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
 
     if (p->status_bar) {
@@ -1301,8 +1290,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis)
  * \param string   String that gets written.
  */
 MODULE_EXPORT void viacast_lcd_string(Driver *drvthis, int x, int y,
-                                      const char string[])
-{
+                                      const char string[]) {
   PrivateData *p = drvthis->private_data;
   int i;
 
@@ -1326,8 +1314,7 @@ MODULE_EXPORT void viacast_lcd_string(Driver *drvthis, int x, int y,
  * \return         String representation of the key;
  *                 \c NULL if nothing available / unmapped key.
  */
-MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
-{
+MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
   char key[MAX_DEVICES][128] = {{0}};
   char fullpath[1024];
@@ -1388,14 +1375,15 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
       key_pressed |= 1 << i;
       break;
     case 'B':
-      battery_read= key[i][1];
-      updateBattery(&p->battery, battery_read);
-    
-      if (p->battery.new_state != p->battery.state){
+      battery_read = key[i][1];
+      updateBattery(&p->battery);
+
+      if (p->battery.new_state != p->battery.state) {
         report(RPT_INFO, "Battery read:%u", battery_read);
         report(RPT_INFO, "Loading new icon state:%d", p->battery.new_state);
 
-        sprintf(fullpath, "/viacast/lcd/icons/battery_state_%u.png", p->battery.new_state);
+        sprintf(fullpath, "/viacast/lcd/icons/battery_state_%u.png",
+                p->battery.new_state);
         p->icon_battery = gp_load_png(fullpath, NULL);
         p->battery.state = p->battery.new_state;
       }
@@ -1417,7 +1405,7 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
     case 'Y':
       viacast_lcd_set_rotate(drvthis, 3);
       return NULL;
-    
+
     default:
       break;
     }
@@ -1481,8 +1469,7 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis)
  * \param y        Vertical character position (row).
  * \param c        Character that gets written.
  */
-MODULE_EXPORT void viacast_lcd_chr(Driver *drvthis, int x, int y, char c)
-{
+MODULE_EXPORT void viacast_lcd_chr(Driver *drvthis, int x, int y, char c) {
   PrivateData *p = drvthis->private_data;
 
   int offset;
@@ -1509,8 +1496,7 @@ MODULE_EXPORT void viacast_lcd_chr(Driver *drvthis, int x, int y, char c)
  * \retval 0       Icon has been successfully defined/written.
  * \retval <0      Server core shall define/write the icon.
  */
-MODULE_EXPORT int viacast_lcd_icon(Driver *drvthis, int x, int y, int icon)
-{
+MODULE_EXPORT int viacast_lcd_icon(Driver *drvthis, int x, int y, int icon) {
   switch (icon) {
   case ICON_BLOCK_FILLED:
     viacast_lcd_chr(drvthis, x, y, 0x1f);
@@ -1558,8 +1544,7 @@ MODULE_EXPORT int viacast_lcd_icon(Driver *drvthis, int x, int y, int icon)
  * \param options  Options (currently unused).
  */
 MODULE_EXPORT void viacast_lcd_hbar(Driver *drvthis, int x, int y, int len,
-                                    int promille, int options)
-{
+                                    int promille, int options) {
   lib_hbar_static(drvthis, x, y, len, promille, options, 5, 0x0f);
 }
 
@@ -1573,8 +1558,7 @@ MODULE_EXPORT void viacast_lcd_hbar(Driver *drvthis, int x, int y, int len,
  * \param options  Options (currently unused).
  */
 MODULE_EXPORT void viacast_lcd_vbar(Driver *drvthis, int x, int y, int len,
-                                    int promille, int options)
-{
+                                    int promille, int options) {
   lib_vbar_static(drvthis, x, y, len, promille, options, 5, 0x0a);
 }
 
@@ -1583,8 +1567,7 @@ MODULE_EXPORT void viacast_lcd_vbar(Driver *drvthis, int x, int y, int len,
  * \param drvthis  Pointer to driver structure.
  * \return Stored rotate in promille.
  */
-MODULE_EXPORT int viacast_lcd_get_rotate(Driver *drvthis)
-{
+MODULE_EXPORT int viacast_lcd_get_rotate(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
   return p->rotate;
@@ -1595,8 +1578,7 @@ MODULE_EXPORT int viacast_lcd_get_rotate(Driver *drvthis)
  * \param drvthis  Pointer to driver structure.
  * \param rotate Set new rotate
  */
-MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate)
-{
+MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate) {
   PrivateData *p = drvthis->private_data;
 
   if ((rotate < 0) || (rotate > 3))
@@ -1604,8 +1586,7 @@ MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate)
 
   if ((rotate == 1) || (rotate == 3)) {
     p->resize = 1;
-  }
-  else {
+  } else {
     p->resize = 0;
   }
 
@@ -1618,8 +1599,7 @@ MODULE_EXPORT void viacast_lcd_set_rotate(Driver *drvthis, int rotate)
  * \param drvthis  Pointer to driver structure.
  * \return Stored rotate in promille.
  */
-MODULE_EXPORT int viacast_lcd_get_display_text(Driver *drvthis)
-{
+MODULE_EXPORT int viacast_lcd_get_display_text(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
   return p->always_text_bar;
@@ -1631,8 +1611,7 @@ MODULE_EXPORT int viacast_lcd_get_display_text(Driver *drvthis)
  * \param rotate Set new rotate
  */
 MODULE_EXPORT void viacast_lcd_set_display_text(Driver *drvthis,
-                                                int always_text)
-{
+                                                int always_text) {
   PrivateData *p = drvthis->private_data;
 
   if ((always_text < 0) || (always_text > 1))
@@ -1646,8 +1625,7 @@ MODULE_EXPORT void viacast_lcd_set_display_text(Driver *drvthis,
  * \param drvthis  Pointer to driver structure.
  * \return Stored rotate in promille.
  */
-MODULE_EXPORT int viacast_lcd_get_display_status_bar(Driver *drvthis)
-{
+MODULE_EXPORT int viacast_lcd_get_display_status_bar(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
   return p->always_status_bar;
@@ -1659,8 +1637,7 @@ MODULE_EXPORT int viacast_lcd_get_display_status_bar(Driver *drvthis)
  * \param rotate Set new rotate
  */
 MODULE_EXPORT void viacast_lcd_set_display_status_bar(Driver *drvthis,
-                                                int always_status_bar)
-{
+                                                      int always_status_bar) {
   PrivateData *p = drvthis->private_data;
 
   if ((always_status_bar < 0) || (always_status_bar > 1))
@@ -1669,9 +1646,6 @@ MODULE_EXPORT void viacast_lcd_set_display_status_bar(Driver *drvthis,
   p->always_status_bar = always_status_bar;
 }
 
-
-
-MODULE_EXPORT const char *viacast_lcd_get_pretty_name(Driver *drvthis)
-{
+MODULE_EXPORT const char *viacast_lcd_get_pretty_name(Driver *drvthis) {
   return "Viacast";
 }
