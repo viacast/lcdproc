@@ -401,6 +401,10 @@ void draw_icons_1(Driver *drvthis) {
     }
 
     sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
+    if(p->man_battery.external.battery_percentual < 10){
+      sprintf(string, "0%u%%", p->man_battery.external.battery_percentual);
+    }
+
     revstr(string);
 
     x_width +=
@@ -561,6 +565,9 @@ void draw_icons_3(Driver *drvthis) {
     }
 
     sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
+    if(p->man_battery.external.battery_percentual < 10){
+      sprintf(string, "0%u%%", p->man_battery.external.battery_percentual);
+    }
     x_width +=
         ((p->text_style_battery.font->max_glyph_width) * (strlen(string)));
     x_available -= x_width;
@@ -707,6 +714,10 @@ void draw_icons_2(Driver *drvthis) {
     }
 
     sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
+    if(p->man_battery.external.battery_percentual < 10){
+      sprintf(string, "0%u%%", p->man_battery.external.battery_percentual);
+    }
+
     x_width +=
         ((p->text_style_battery.font->max_glyph_width) * (strlen(string) + 1));
     coordx -= x_width;
