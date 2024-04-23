@@ -11,6 +11,15 @@
 #define MAX_DELTA 1
 #define N_BATTERY_STATE 4
 
+typedef struct {
+  int state;
+  int new_state;
+  uint16_t battery_values[SIZE];
+  uint16_t battery_current;
+  uint32_t battery_percentual;
+  uint16_t head; // Points to the position to insert the next element
+} Battery;
+
 /**
  * Represent a battery
  * \param state     State of battery
@@ -39,15 +48,12 @@ typedef struct {
 
   u_int8_t cycles_to_read;
   
-  int new_state;
   uint16_t max_battery;
   uint16_t min_battery;
   uint16_t min_font;
-  uint16_t battery_values[SIZE];
-  uint16_t battery_current;
-  uint32_t battery_percentual;
-  uint16_t head; // Points to the position to insert the next element
-} Battery;
+  Battery internal;
+  Battery external;
+} ManagerBattery;
 
 int filter(const struct dirent *name);
 
@@ -55,4 +61,4 @@ bool writeInFile(const char * filename, char *content);
 
 void check_inotify_event(struct inotify_event *i, int *reload_icons);
 
-void updateBattery(Battery* battery);
+void updateBattery(ManagerBattery *man_battery, Battery *battery);

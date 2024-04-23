@@ -14,34 +14,45 @@ bool writeInFile(const char *filename, char *content) {
   return true;
 }
 
-bool readBatteryFromFile(const char *filename, Battery *battery) {
+bool readBatteryFromFile(const char *filename, ManagerBattery *man_battery) {
   FILE *fp = fopen(filename, "r");
   if (!fp) {
     return false;
   }
 
   fscanf(fp, "%" SCNu16 ",%" SCNu16 ",%" SCNu16 ",%" SCNu16 ",%" SCNu16,
-         &battery->is_drain_ext_battery, &battery->voltage_ext_battery,
-         &battery->voltage_int_battery, &battery->is_power_supply,
-         &battery->voltage_power_supply);
+         &man_battery->is_drain_ext_battery, &man_battery->voltage_ext_battery,
+         &man_battery->voltage_int_battery, &man_battery->is_power_supply,
+         &man_battery->voltage_power_supply);
   fclose(fp);
-
 
   return true;
 }
 
-void appendValueBattery(Battery *battery, uint16_t value) {
+void appendValueBattery(ManagerBattery *man_battery, uint16_t valueext,
+                        uint16_t valueint) {
 
-  if (value > battery->max_battery) {
-    value = battery->max_battery;
+  if (valueext > man_battery->max_battery) {
+    valueext = man_battery->max_battery;
   }
 
-  if (value < battery->min_battery) {
-    value = battery->min_battery;
+  if (valueext < man_battery->min_battery) {
+    valueext = man_battery->min_battery;
   }
 
-  battery->battery_values[battery->head] = value;
-  battery->head = (battery->head + 1) % SIZE;
+  man_battery->external.battery_values[man_battery->external.head] = valueext;
+  man_battery->external.head = (man_battery->external.head + 1) % SIZE;
+
+  if (valueint > man_battery->max_battery) {
+    valueint = man_battery->max_battery;
+  }
+
+  if (valueint < man_battery->min_battery) {
+    valueint = man_battery->min_battery;
+  }
+
+  man_battery->internal.battery_values[man_battery->internal.head] = valueint;
+  man_battery->internal.head = (man_battery->internal.head + 1) % SIZE;
 }
 
 uint16_t getMeanBattery(Battery *battery) {
@@ -85,12 +96,12 @@ check_inotify_event(struct inotify_event *i, int *reload_icons) {
     *reload_icons = 1;
 }
 
-void getPercentBattery(Battery *battery) {
+void getPercentBattery(ManagerBattery *man_battery, Battery *battery) {
 
   battery->battery_percentual =
-      (uint32_t)(((battery->battery_current - battery->min_battery) * 100U) /
-                 (battery->max_battery - battery->min_battery));
-
+      (uint32_t)(((battery->battery_current - man_battery->min_battery) *
+                  100U) /
+                 (man_battery->max_battery - man_battery->min_battery));
 
   if (battery->battery_percentual > 100) {
     battery->battery_percentual = 100;
@@ -101,32 +112,34 @@ void getPercentBattery(Battery *battery) {
   }
 }
 
-void updateBattery(Battery *battery) {
+void updateBattery(ManagerBattery *man_battery, Battery *battery) {
 
-  if (battery->cycles_to_read < 10) {
-    battery->cycles_to_read++;
+  if (man_battery->cycles_to_read < 10) {
+    man_battery->cycles_to_read++;
     return;
   }
 
-  battery->cycles_to_read = 0;
+  man_battery->cycles_to_read = 0;
 
   uint8_t interval =
-      ((battery->max_battery - battery->min_battery) / N_BATTERY_STATE);
+      ((man_battery->max_battery - man_battery->min_battery) / N_BATTERY_STATE);
 
-  readBatteryFromFile("/tmp/battery-manager", battery);
-  appendValueBattery(battery, battery->voltage_ext_battery);
-  getPercentBattery(battery);
+  readBatteryFromFile("/tmp/battery-manager", man_battery);
+  appendValueBattery(man_battery, man_battery->voltage_ext_battery,
+                     man_battery->voltage_int_battery);
+  getPercentBattery(man_battery, &man_battery->external);
+  getPercentBattery(man_battery, &man_battery->internal);
   tryUpdateBatteryCurrent(battery);
 
-  if (battery->is_power_supply == 1) {
+  if (man_battery->is_power_supply == 1) {
     battery->new_state = 0;
     return;
   }
 
   battery->new_state =
-      battery->battery_current <= battery->min_battery + (0 * interval)   ? 5
-      : battery->battery_current <= battery->min_battery + (1 * interval) ? 4
-      : battery->battery_current <= battery->min_battery + (2 * interval) ? 3
-      : battery->battery_current <= battery->min_battery + (3 * interval) ? 2
+      battery->battery_current <= man_battery->min_battery + (0 * interval)   ? 5
+      : battery->battery_current <= man_battery->min_battery + (1 * interval) ? 4
+      : battery->battery_current <= man_battery->min_battery + (2 * interval) ? 3
+      : battery->battery_current <= man_battery->min_battery + (3 * interval) ? 2
                                                                           : 1;
 }

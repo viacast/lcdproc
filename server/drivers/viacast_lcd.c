@@ -89,7 +89,7 @@ typedef struct text_private_data {
   int autorotate;
   int rotate;
   int keypad_rotate;
-  Battery battery;
+  ManagerBattery man_battery;
 
   long timer;
 
@@ -113,7 +113,9 @@ typedef struct text_private_data {
   int hide_text;
   int secs_hide_text;
   gp_pixmap *pixmap;
-  gp_pixmap *icon_battery;
+  gp_pixmap *icon_battery_external;
+  gp_pixmap *icon_battery_internal;
+  gp_pixmap *icon_low_battery;
   gp_pixmap **icon_l;
   gp_pixmap **icon_l2;
   gp_pixmap **icon_r;
@@ -363,7 +365,8 @@ void draw_icons_1(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
   char string[5];
 
-  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) && (!p->icon_battery))
+  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) &&
+      (!p->icon_battery_external))
     return;
 
   int i = 0;
@@ -385,7 +388,7 @@ void draw_icons_1(Driver *drvthis) {
   /* Battery */
   do {
 
-    if (!p->icon_battery) {
+    if (!p->icon_battery_external) {
       break;
     }
 
@@ -397,7 +400,7 @@ void draw_icons_1(Driver *drvthis) {
       need_create_status_bar = 0;
     }
 
-    sprintf(string, "%u%%", p->battery.battery_percentual);
+    sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
     revstr(string);
 
     x_width +=
@@ -410,12 +413,12 @@ void draw_icons_1(Driver *drvthis) {
             GP_ALIGN_LEFT | GP_VALIGN_BELOW | GP_TEXT_BEARING, p->white_pixel,
             p->black_pixel, string);
 
-    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
+    x_width = gp_pixmap_w(p->icon_battery_external) + DEFAULT_H_SPACE_ICON;
 
     if (x_width > x_available)
       break;
 
-    temp_icon = gp_filter_rotate_180_alloc(p->icon_battery, NULL);
+    temp_icon = gp_filter_rotate_180_alloc(p->icon_battery_external, NULL);
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
 
@@ -524,7 +527,7 @@ void draw_icons_3(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
   char string[5];
 
-  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_battery))
+  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_battery_external))
     return;
 
   int i = 0;
@@ -543,7 +546,7 @@ void draw_icons_3(Driver *drvthis) {
 
   /* Battery */
   do {
-    if (!p->icon_battery)
+    if (!p->icon_battery_external)
       break;
 
     if (x_width > x_available)
@@ -557,7 +560,7 @@ void draw_icons_3(Driver *drvthis) {
       need_create_status_bar = 0;
     }
 
-    sprintf(string, "%u%%", p->battery.battery_percentual);
+    sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
     x_width +=
         ((p->text_style_battery.font->max_glyph_width) * (strlen(string)));
     x_available -= x_width;
@@ -570,7 +573,7 @@ void draw_icons_3(Driver *drvthis) {
 
     coordx += x_width + 2;
 
-    temp_icon = gp_filter_rotate_180_alloc(p->icon_battery, NULL);
+    temp_icon = gp_filter_rotate_180_alloc(p->icon_battery_external, NULL);
     gp_blit_clipped(temp_icon, 0, 0, gp_pixmap_w(temp_icon),
                     gp_pixmap_h(temp_icon), p->pixmap, coordx, coordy);
 
@@ -671,7 +674,8 @@ void draw_icons_2(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
   char string[5];
 
-  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) && (!p->icon_battery))
+  if ((!p->icon_l) && (!p->icon_r) && (!p->icon_l2) &&
+      (!p->icon_battery_external))
     return;
 
   int i = 0;
@@ -689,7 +693,7 @@ void draw_icons_2(Driver *drvthis) {
 
   /* Battery */
   do {
-    if (!p->icon_battery)
+    if (!p->icon_battery_external)
       break;
     ;
 
@@ -702,7 +706,7 @@ void draw_icons_2(Driver *drvthis) {
       need_create_status_bar = 0;
     }
 
-    sprintf(string, "%u%%", p->battery.battery_percentual);
+    sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
     x_width +=
         ((p->text_style_battery.font->max_glyph_width) * (strlen(string) + 1));
     coordx -= x_width;
@@ -716,12 +720,13 @@ void draw_icons_2(Driver *drvthis) {
     coordx -= x_width;
     x_available -= x_width;
 
-    x_width = gp_pixmap_w(p->icon_battery) + DEFAULT_H_SPACE_ICON;
+    x_width = gp_pixmap_w(p->icon_battery_external) + DEFAULT_H_SPACE_ICON;
     if (x_width > x_available)
       continue;
 
-    gp_blit_clipped(p->icon_battery, 0, 0, gp_pixmap_w(p->icon_battery),
-                    gp_pixmap_h(p->icon_battery), p->pixmap, coordx, coordy);
+    gp_blit_clipped(
+        p->icon_battery_external, 0, 0, gp_pixmap_w(p->icon_battery_external),
+        gp_pixmap_h(p->icon_battery_external), p->pixmap, coordx, coordy);
   } while (0);
 
   /* Right */
@@ -839,10 +844,17 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
   p->timer = 0;
   p->speed = DEFAULT_SPEED;
   p->status_bar = 1;
-  memset(p->battery.battery_values, 0, sizeof(p->battery.battery_values));
-  p->battery.battery_current = 0;
-  p->battery.head = 0;
-  p->battery.state = -1;
+  memset(p->man_battery.external.battery_values, 0,
+         sizeof(p->man_battery.external.battery_values));
+  p->man_battery.external.battery_current = 0;
+  p->man_battery.external.head = 0;
+  p->man_battery.external.state = -1;
+
+  memset(p->man_battery.internal.battery_values, 0,
+         sizeof(p->man_battery.internal.battery_values));
+  p->man_battery.internal.battery_current = 0;
+  p->man_battery.internal.head = 0;
+  p->man_battery.internal.state = -1;
   debug(RPT_INFO, "viacast_lcd: init(%p)", drvthis);
 
   /* Read config file */
@@ -889,7 +901,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
            DEFAULT_MAX_BATTERY);
     tmp = DEFAULT_MAX_BATTERY;
   }
-  p->battery.max_battery = (uint16_t)tmp;
+  p->man_battery.max_battery = (uint16_t)tmp;
 
   /* Which min battery ?*/
   tmp = drvthis->config_get_int(drvthis->name, "MinBattery", 0,
@@ -899,7 +911,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
            DEFAULT_MIN_BATTERY);
     tmp = DEFAULT_MIN_BATTERY;
   }
-  p->battery.min_battery = (uint16_t)tmp;
+  p->man_battery.min_battery = (uint16_t)tmp;
 
   /* Which min font ?*/
   tmp = drvthis->config_get_int(drvthis->name, "MinFont", 0, DEFAULT_MIN_FONT);
@@ -908,7 +920,7 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
            DEFAULT_MIN_FONT);
     tmp = DEFAULT_MIN_FONT;
   }
-  p->battery.min_font = (uint16_t)tmp;
+  p->man_battery.min_font = (uint16_t)tmp;
 
   /* Which rotate ?*/
   tmp = drvthis->config_get_int(drvthis->name, "Rotate", 0, DEFAULT_ROTATE);
@@ -1020,8 +1032,11 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
 
   p->black_pixel = gp_rgb_to_pixmap_pixel(0x00, 0x00, 0x00, p->pixmap);
   p->white_pixel = gp_rgb_to_pixmap_pixel(0xff, 0xff, 0xff, p->pixmap);
-  p->icon_battery = gp_pixmap_alloc(DEFAULT_HEIGHT_ICON, DEFAULT_HEIGHT_ICON,
-                                    GP_PIXEL_RGB565);
+  p->icon_battery_external = gp_pixmap_alloc(
+      DEFAULT_HEIGHT_ICON, DEFAULT_HEIGHT_ICON, GP_PIXEL_RGB565);
+  p->icon_battery_internal = gp_pixmap_alloc(
+      DEFAULT_HEIGHT_ICON, DEFAULT_HEIGHT_ICON, GP_PIXEL_RGB565);
+  p->icon_low_battery = gp_pixmap_alloc(168, 120, GP_PIXEL_RGB565);
   viacast_lcd_setup_gfxprim(drvthis);
 
   report(RPT_INFO, "Infos about fbdev\nwidth:%d\nheight:%d\nbits_per_pixel:%d",
@@ -1165,16 +1180,17 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis) {
 MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
+  updateBattery(&p->man_battery, &p->man_battery.external);
+  updateBattery(&p->man_battery, &p->man_battery.internal);
 
-  updateBattery(&p->battery);
-
-  if (p->battery.new_state != p->battery.state) {
-    report(RPT_INFO, "Loading new icon state:%d", p->battery.new_state);
+  if (p->man_battery.external.new_state != p->man_battery.external.state) {
+    report(RPT_INFO, "Loading new icon state:%d",
+           p->man_battery.external.new_state);
     char fullpath[256];
     sprintf(fullpath, "/viacast/lcd/icons/battery_state_%u.png",
-            p->battery.new_state);
-    p->icon_battery = gp_load_png(fullpath, NULL);
-    p->battery.state = p->battery.new_state;
+            p->man_battery.external.new_state);
+    p->icon_battery_external = gp_load_png(fullpath, NULL);
+    p->man_battery.external.state = p->man_battery.external.new_state;
   }
 
   if (p->reload_icons) {
@@ -1184,6 +1200,8 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
 
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
 
+  p->icon_low_battery = gp_load_png("/viacast/lcd/icons/low-battery.png", NULL);
+  gp_blit_clipped(p->icon_low_battery, 0, 0, 160, 128, p->pixmap, 0, 0);
   if (p->resize) {
     gp_pixmap *resized = gp_filter_resize_alloc(
         p->pixmap, gp_pixmap_w(p->pixmap),
@@ -1376,17 +1394,17 @@ MODULE_EXPORT const char *viacast_lcd_get_key(Driver *drvthis) {
       break;
     case 'B':
       battery_read = key[i][1];
-      updateBattery(&p->battery);
+      // updateBattery(&p->battery);
 
-      if (p->battery.new_state != p->battery.state) {
-        report(RPT_INFO, "Battery read:%u", battery_read);
-        report(RPT_INFO, "Loading new icon state:%d", p->battery.new_state);
+      // if (p->battery.new_state != p->battery.state) {
+      //   report(RPT_INFO, "Battery read:%u", battery_read);
+      //   report(RPT_INFO, "Loading new icon state:%d", p->battery.new_state);
 
-        sprintf(fullpath, "/viacast/lcd/icons/battery_state_%u.png",
-                p->battery.new_state);
-        p->icon_battery = gp_load_png(fullpath, NULL);
-        p->battery.state = p->battery.new_state;
-      }
+      //   sprintf(fullpath, "/viacast/lcd/icons/battery_state_%u.png",
+      //           p->battery.new_state);
+      //   p->icon_battery = gp_load_png(fullpath, NULL);
+      //   p->battery.state = p->battery.new_state;
+      // }
       break;
 
     // Accelerometer
