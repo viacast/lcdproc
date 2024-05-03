@@ -400,9 +400,16 @@ void draw_icons_1(Driver *drvthis) {
       need_create_status_bar = 0;
     }
 
-    sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
-    if(p->man_battery.external.battery_percentual < 10){
-      sprintf(string, "0%u%%", p->man_battery.external.battery_percentual);
+    if (p->man_battery.is_drain_ext_battery) {
+      sprintf(string, "E%u%%", p->man_battery.external.battery_percentual);
+      if (p->man_battery.external.battery_percentual < 10) {
+        sprintf(string, "E0%u%%", p->man_battery.external.battery_percentual);
+      }
+    } else {
+      sprintf(string, "I%u%%", p->man_battery.internal.battery_percentual);
+      if (p->man_battery.internal.battery_percentual < 10) {
+        sprintf(string, "I0%u%%", p->man_battery.internal.battery_percentual);
+      }
     }
 
     revstr(string);
@@ -564,10 +571,18 @@ void draw_icons_3(Driver *drvthis) {
       need_create_status_bar = 0;
     }
 
-    sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
-    if(p->man_battery.external.battery_percentual < 10){
-      sprintf(string, "0%u%%", p->man_battery.external.battery_percentual);
+    if (p->man_battery.is_drain_ext_battery) {
+      sprintf(string, "E%u%%", p->man_battery.external.battery_percentual);
+      if (p->man_battery.external.battery_percentual < 10) {
+        sprintf(string, "E0%u%%", p->man_battery.external.battery_percentual);
+      }
+    } else {
+      sprintf(string, "I%u%%", p->man_battery.internal.battery_percentual);
+      if (p->man_battery.internal.battery_percentual < 10) {
+        sprintf(string, "I0%u%%", p->man_battery.internal.battery_percentual);
+      }
     }
+
     x_width +=
         ((p->text_style_battery.font->max_glyph_width) * (strlen(string)));
     x_available -= x_width;
@@ -713,9 +728,16 @@ void draw_icons_2(Driver *drvthis) {
       need_create_status_bar = 0;
     }
 
-    sprintf(string, "%u%%", p->man_battery.external.battery_percentual);
-    if(p->man_battery.external.battery_percentual < 10){
-      sprintf(string, "0%u%%", p->man_battery.external.battery_percentual);
+    if (p->man_battery.is_drain_ext_battery) {
+      sprintf(string, "E%u%%", p->man_battery.external.battery_percentual);
+      if (p->man_battery.external.battery_percentual < 10) {
+        sprintf(string, "E0%u%%", p->man_battery.external.battery_percentual);
+      }
+    } else {
+      sprintf(string, "I%u%%", p->man_battery.internal.battery_percentual);
+      if (p->man_battery.internal.battery_percentual < 10) {
+        sprintf(string, "I0%u%%", p->man_battery.internal.battery_percentual);
+      }
     }
 
     x_width +=
@@ -1211,8 +1233,23 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
 
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
 
-  p->icon_low_battery = gp_load_png("/viacast/lcd/icons/low-battery.png", NULL);
-  gp_blit_clipped(p->icon_low_battery, 0, 0, 160, 128, p->pixmap, 0, 0);
+  do {
+
+    if (p->man_battery.is_power_supply == 1) {
+      break;
+    }
+    if (p->man_battery.external.battery_percentual > 10 &&
+        p->man_battery.internal.battery_percentual > 10) {
+
+      break;
+    }
+    gp_fill(p->pixmap, p->black_pixel);
+    p->icon_low_battery =
+        gp_load_png("/viacast/lcd/icons/low-battery.png", NULL);
+    gp_blit_clipped(p->icon_low_battery, 0, 0, 160, 128, p->pixmap, 0, 0);
+
+  } while (0);
+
   if (p->resize) {
     gp_pixmap *resized = gp_filter_resize_alloc(
         p->pixmap, gp_pixmap_w(p->pixmap),
