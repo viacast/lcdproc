@@ -1213,6 +1213,9 @@ MODULE_EXPORT void viacast_lcd_clear(Driver *drvthis) {
 MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
   PrivateData *p = drvthis->private_data;
 
+  do {
+
+  break;
   updateBattery(&p->man_battery, &p->man_battery.external);
   updateBattery(&p->man_battery, &p->man_battery.internal);
 
@@ -1230,10 +1233,17 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
     reload_icons(drvthis);
     p->reload_icons = 0;
   }
+  }
+  while (0); 
 
+  report(RPT_INFO, "Aqui 1\n");
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
+  report(RPT_INFO, "Aqui 2\n");
+
 
   do {
+
+    break;
 
     if (p->man_battery.is_power_supply == 1) {
       break;
@@ -1274,7 +1284,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
 
   if (p->rotate == 1) {
 
-    draw_icons_1(drvthis);
+    // draw_icons_1(drvthis);
 
     x = gp_pixmap_w(p->pixmap);
     x -= (p->text_style.font->max_glyph_width / 2);
@@ -1289,7 +1299,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
     }
   } else if (p->rotate == 3) {
 
-    draw_icons_3(drvthis);
+    // draw_icons_3(drvthis);
 
     y = (p->height * text_height);
     for (i = 0; i < p->height; i++) {
@@ -1303,7 +1313,7 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
     y = gp_pixmap_h(p->pixmap) - (p->height * text_height);
 
     if (p->status_bar) {
-      draw_icons_2(drvthis);
+      // draw_icons_2(drvthis);
     }
 
     if (p->display_text) {
