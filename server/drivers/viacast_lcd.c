@@ -140,11 +140,11 @@ void destroy_icons(Driver *drvthis);
 void draw_icons_1(Driver *drvthis);
 void draw_icons_2(Driver *drvthis);
 void draw_icons_3(Driver *drvthis);
-void sighandler(const int signal, void *ptr);
+void sighandler(const int signal, siginfo_t *info, void *ptr);
 static int is_valid_fd(int fd);
 static void revestr(char *str1);
 
-void sighandler(const int signal, void *ptr) {
+void sighandler(const int signal, siginfo_t *info, void *ptr) {
   static PrivateData *p = NULL;
 
   if (p == NULL) {
@@ -1120,9 +1120,16 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
   /*Config iontify*/
   p->reload_icons = 1;
 
-  signal(SIGRTMIN, sighandler);
-  signal(SIGRTMIN + 1, sighandler);
-  sighandler(SIGRTMAX, drvthis->private_data);
+  struct sigaction action;
+  memset(&action, 0, sizeof(action));
+
+  action.sa_sigaction = sighandler;
+  action.sa_flags = SA_SIGINFO;
+  
+  sigaction(SIGRTMIN, &action, NULL);
+  sigaction(SIGRTMIN+1, &action, NULL);
+
+  sighandler(SIG_DFL, NULL, drvthis->private_data);
 
   report(RPT_INFO, "%s: init() done", drvthis->name);
   sleep(1);
