@@ -52,6 +52,9 @@ typedef struct {
   uint16_t min_font;
   Battery internal;
   Battery external;
+
+  bool is_file_manager;
+  int n_tries_read_file_manager;
 } ManagerBattery;
 
 int filter(const struct dirent *name);

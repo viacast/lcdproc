@@ -876,6 +876,8 @@ MODULE_EXPORT int viacast_lcd_init(Driver *drvthis) {
   p->man_battery.state = -1;
   p->man_battery.new_state = -2;
   p->man_battery.cycles_to_read = -1;
+  p->man_battery.is_file_manager = false;
+  p->man_battery.n_tries_read_file_manager = 0;
 
   memset(p->man_battery.external.battery_values, 0,
          sizeof(p->man_battery.external.battery_values));
@@ -1219,6 +1221,10 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
   do {
 
     if (!updateBattery(&p->man_battery)) {
+      if (!p->man_battery.is_file_manager) {
+        p->icon_battery = NULL;
+        p->man_battery.state = -1;
+      }
       break;
     }
 
@@ -1243,6 +1249,9 @@ MODULE_EXPORT void viacast_lcd_flush(Driver *drvthis) {
   memcpy(p->pixmap->pixels, p->framebuf_fbdev, p->fbdev_data_size);
 
   do {
+    if (!p->man_battery.is_file_manager) {
+      break;
+    }
 
     if (p->man_battery.is_power_supply == 1) {
       break;

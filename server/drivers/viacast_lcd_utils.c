@@ -125,8 +125,15 @@ bool updateBattery(ManagerBattery *man_battery) {
       ((man_battery->max_battery - man_battery->min_battery) / N_BATTERY_STATE);
 
   if (!readBatteryFromFile("/tmp/battery-manager", man_battery)) {
+    man_battery->n_tries_read_file_manager++;
+    if (man_battery->n_tries_read_file_manager > 10){
+      man_battery->is_file_manager = false;
+    }
     return false;
   }
+
+  man_battery->n_tries_read_file_manager = 0;
+  man_battery->is_file_manager = true;
 
   appendValueBattery(man_battery, man_battery->voltage_ext_battery,
                      man_battery->voltage_int_battery);
