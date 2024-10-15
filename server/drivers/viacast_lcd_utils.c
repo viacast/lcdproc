@@ -112,11 +112,11 @@ void getPercentBattery(ManagerBattery *man_battery, Battery *battery) {
   }
 }
 
-void updateBattery(ManagerBattery *man_battery, Battery *battery) {
+bool updateBattery(ManagerBattery *man_battery) {
 
   if (man_battery->cycles_to_read < 10) {
     man_battery->cycles_to_read++;
-    return;
+    return false;
   }
 
   man_battery->cycles_to_read = 0;
@@ -124,22 +124,33 @@ void updateBattery(ManagerBattery *man_battery, Battery *battery) {
   uint8_t interval =
       ((man_battery->max_battery - man_battery->min_battery) / N_BATTERY_STATE);
 
-  readBatteryFromFile("/tmp/battery-manager", man_battery);
-  appendValueBattery(man_battery, man_battery->voltage_ext_battery,
-                     man_battery->voltage_int_battery);
-  getPercentBattery(man_battery, &man_battery->external);
-  getPercentBattery(man_battery, &man_battery->internal);
-  tryUpdateBatteryCurrent(battery);
-
-  if (man_battery->is_power_supply == 1) {
-    battery->new_state = 0;
-    return;
+  if (!readBatteryFromFile("/tmp/battery-manager", man_battery)) {
+    return false;
   }
 
-  battery->new_state =
-      battery->battery_current <= man_battery->min_battery + (0 * interval)   ? 5
-      : battery->battery_current <= man_battery->min_battery + (1 * interval) ? 4
-      : battery->battery_current <= man_battery->min_battery + (2 * interval) ? 3
-      : battery->battery_current <= man_battery->min_battery + (3 * interval) ? 2
-                                                                          : 1;
+  appendValueBattery(man_battery, man_battery->voltage_ext_battery,
+                     man_battery->voltage_int_battery);
+
+  getPercentBattery(man_battery, &man_battery->external);
+  getPercentBattery(man_battery, &man_battery->internal);
+
+  tryUpdateBatteryCurrent(&man_battery->external);
+  tryUpdateBatteryCurrent(&man_battery->internal);
+
+  if (man_battery->is_power_supply == 1) {
+    man_battery->new_state = 0;
+    return true;
+  }
+
+  uint16_t current = man_battery->is_drain_ext_battery == 1
+                         ? man_battery->external.battery_current
+                         : man_battery->internal.battery_current;
+
+  man_battery->new_state =
+      current <= man_battery->min_battery + (0 * interval)   ? 5
+      : current <= man_battery->min_battery + (1 * interval) ? 4
+      : current <= man_battery->min_battery + (2 * interval) ? 3
+      : current <= man_battery->min_battery + (3 * interval) ? 2
+                                                             : 1;
+  return true;
 }

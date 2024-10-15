@@ -12,8 +12,6 @@
 #define N_BATTERY_STATE 4
 
 typedef struct {
-  int state;
-  int new_state;
   uint16_t battery_values[SIZE];
   uint16_t battery_current;
   uint32_t battery_percentual;
@@ -39,6 +37,7 @@ typedef struct {
     4:  down 25;
     5:  equal 0   
     */
+  int new_state;
 
   uint16_t is_drain_ext_battery;
   uint16_t voltage_ext_battery;
@@ -61,4 +60,4 @@ bool writeInFile(const char * filename, char *content);
 
 void check_inotify_event(struct inotify_event *i, int *reload_icons);
 
-void updateBattery(ManagerBattery *man_battery, Battery *battery);
+bool updateBattery(ManagerBattery *man_battery);
